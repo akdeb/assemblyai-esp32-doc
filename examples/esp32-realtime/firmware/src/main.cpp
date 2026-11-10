@@ -1,4 +1,4 @@
-// ESP32-S3 client for the AssemblyAI real-time relay.
+// ESP32-S3 client for the AssemblyAI realtime server.
 //   mic (I2S0) -> PCM16 16 kHz -> WebSocket -> relay
 //   relay -> PCM16 24 kHz -> ring buffer -> speaker (I2S1)
 
@@ -62,8 +62,8 @@ static void setupI2S() {
 
 static void onEvent(WStype_t type, uint8_t* payload, size_t length) {
   switch (type) {
-    case WStype_CONNECTED: connected = true; Serial.println("relay connected"); break;
-    case WStype_DISCONNECTED: connected = false; ringClear(); Serial.println("relay disconnected"); break;
+    case WStype_CONNECTED: connected = true; Serial.println("server connected"); break;
+    case WStype_DISCONNECTED: connected = false; ringClear(); Serial.println("server disconnected"); break;
     case WStype_BIN: ringPush(payload, length); break;  // TTS audio
     case WStype_TEXT: {
       JsonDocument doc;
@@ -81,7 +81,7 @@ static void onEvent(WStype_t type, uint8_t* payload, size_t length) {
   }
 }
 
-// Core 0: read the mic, convert 32-bit I2S samples to PCM16, stream to the relay.
+// Core 0: read the mic, convert 32-bit I2S samples to PCM16, stream to the server.
 static void micTask(void*) {
   static int32_t raw[MIC_FRAME];
   static int16_t pcm[MIC_FRAME];

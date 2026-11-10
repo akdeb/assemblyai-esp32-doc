@@ -75,13 +75,24 @@ const hr = "<hr/>";
 const ic = (s) => `<code>${esc(s)}</code>`;
 
 // ---------- ESP32 page body ----------
+// Pull short, real excerpts out of the example source so the page can't drift from the code.
+const between = (src, from, to) => {
+  const i = src.indexOf(from);
+  const j = src.indexOf(to, i);
+  if (i < 0 || j < 0) throw new Error(`excerpt markers not found: ${from} .. ${to}`);
+  return src.slice(i, j).trimEnd();
+};
+
 async function esp32Content() {
   const server = read("server/main.ts");
   const mainCpp = read("firmware/src/main.cpp");
-  const config = read("firmware/src/Config.h");
-  const pio = read("firmware/platformio.ini");
 
-  // Fixed-width layout so columns can't drift: [device box] gap [relay box] gap [AssemblyAI box]
+  const endpoints = between(server, "const STT_URL =", "// Deno's WebSocket");
+  const sttLoop = between(server, "  const stt = authedSocket(STT_URL);", "  // --- Text-to-speech");
+  const turnLoop = between(server, "  async function drain() {", "  // --- Device -> relay");
+  const firmwareIO = between(mainCpp, "// Core 0: read the mic", "void setup()");
+
+  // Fixed-width layout so columns can't drift: [device box] gap [server box] gap [AssemblyAI box]
   const pad = (t, n) => t + " ".repeat(Math.max(0, n - [...t].length));
   const box = (w, rows) => ["┌" + "─".repeat(w) + "┐", ...rows.map((r) => "│" + pad(" " + r, w) + "│"), "└" + "─".repeat(w) + "┘"];
   const dev = box(14, ["INMP441 mic", "", "", "", "", "MAX98357A", "+ speaker"]);
@@ -90,26 +101,27 @@ async function esp32Content() {
   const g1 = ["", " 16kHz", "──────▶", "", "", "", "◀──────", " 24kHz", ""].map((t) => pad(t, 8));
   const g2 = ["", " wss", "─────▶", "◀─────", " https", "─────▶", "◀─────", " wss", ""].map((t) => pad(t, 7));
   const rows = dev.map((_, i) => dev[i] + g1[i] + relay[i] + g2[i] + aai[i]);
-  const diagram = ["  ESP32-S3              Deno relay             AssemblyAI", ...rows].join("\n");
+  const diagram = ["  ESP32-S3              Edge server            AssemblyAI", ...rows].join("\n");
 
   return [
     heading("h2", "overview", "Overview"),
-    p(`This pipeline runs a voice agent on an ESP32-S3, a roughly $10 microcontroller that can capture and play audio but can't run a speech model. The device streams microphone audio to a small Deno relay. The relay transcribes it live with AssemblyAI streaming Speech-to-Text, generates a reply with LLM Gateway, synthesizes speech with Text to Speech, and streams the audio back to the speaker. Interrupt it mid-sentence and it stops.`),
-    p(`The firmware and relay architecture come from ${a(ELATO, "ElatoAI")}, the open-source stack for realtime voice agents on ESP32 (Arduino firmware, Deno edge server, Next.js app, and Supabase). This example is a minimal, standalone version of it with AssemblyAI as the speech provider.`),
-    callout(`Set ${ic("ASSEMBLYAI_API_KEY")} on the relay only. The key never touches the device. Get one from the ${a("https://www.assemblyai.com/dashboard", "AssemblyAI dashboard")}.`),
+    p(`An ESP32-S3 can't run a speech model, so it doesn't try. It streams microphone audio up and plays audio back. A small Deno edge server in the middle does the rest: it pipes the audio into AssemblyAI streaming Speech-to-Text, waits for the end of the user's turn, sends the conversation to LLM Gateway, and streams the reply back through Text to Speech. Talk over the agent, or press the button, and playback stops immediately.`),
+    p(`This is Elato's architecture: Elato's ESP32 firmware talking to Elato's Deno edge server, with ${a(ELATO, "ElatoAI")} as the open-source reference. This page is a minimal, standalone cut of it with AssemblyAI as the speech provider.`),
+    `<div style="display:flex;justify-content:center;margin:1.5rem 0"><iframe src="https://www.youtube.com/embed/FAm6QM6FgiA" title="AssemblyAI voice agent on ESP32 demo" style="width:100%;max-width:340px;aspect-ratio:9/16;border:0;border-radius:12px" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>`,
+    callout(`Set ${ic("ASSEMBLYAI_API_KEY")} on the edge server only. The key never touches the device. Get one from the ${a("https://www.assemblyai.com/dashboard", "AssemblyAI dashboard")}.`),
     hr,
     heading("h2", "architecture", "Architecture"),
     await code(diagram, "text"),
     table(
       ["Hop", "Protocol", "Notes"],
       [
-        ["ESP32 ⇄ relay", "Secure WebSocket", `Binary frames carry audio. JSON frames carry ${ic("state")}, ${ic("transcript")}, and ${ic("interrupt")}.`],
-        ["Relay → STT", `${ic("wss://streaming.assemblyai.com/v3/ws")}`, `16 kHz PCM16 in, ${ic("Turn")} events out. ${ic("end_of_turn")} triggers the LLM.`],
-        ["Relay → LLM", `${ic("POST /v1/chat/completions")}`, "OpenAI-compatible LLM Gateway. Swap models with one environment variable."],
-        ["Relay → TTS", `${ic("wss://tts.us.assemblyai.com/v1/ws")}`, `${ic("Generate")} and ${ic("Flush")} in, base64 PCM16 24 kHz out, ${ic("Cancel")} on barge-in.`],
+        ["ESP32 ⇄ edge server", "Secure WebSocket", `Binary frames carry audio. JSON frames carry ${ic("state")}, ${ic("transcript")}, and ${ic("interrupt")}.`],
+        ["Edge server → STT", `${ic("wss://streaming.assemblyai.com/v3/ws")}`, `16 kHz PCM16 in, ${ic("Turn")} events out. ${ic("end_of_turn")} triggers the LLM.`],
+        ["Edge server → LLM", `${ic("POST /v1/chat/completions")}`, "OpenAI-compatible LLM Gateway. Change the model with one environment variable."],
+        ["Edge server → TTS", `${ic("wss://tts.us.assemblyai.com/v1/ws")}`, `${ic("Generate")} and ${ic("Flush")} in, base64 PCM16 24 kHz out, ${ic("Cancel")} on barge-in.`],
       ],
     ),
-    callout(`This page builds the pipeline from separate AssemblyAI APIs (STT, LLM Gateway, Text to Speech), so you pick each model yourself: ${ic("universal-3-6-pro")} for STT, any LLM Gateway model through ${ic("LLM_MODEL")}, and a TTS voice. The relay also works with the managed Voice Agent API. See ${a("#voice-agent-api-alternative", "Voice Agent API alternative")}.`),
+    callout(`This example calls STT, LLM Gateway, and TTS separately, so you pick each model: ${ic("universal-3-6-pro")} for STT, any LLM Gateway model through ${ic("LLM_MODEL")}, and a TTS voice. You can also use the managed Voice Agent API instead. See ${a("#voice-agent-api-alternative", "Voice Agent API alternative")}.`),
     hr,
     heading("h2", "hardware", "Hardware"),
     table(
@@ -119,65 +131,69 @@ async function esp32Content() {
         ["INMP441 I2S microphone", "Audio in (I2S port 0)."],
         ["MAX98357A I2S amplifier and small speaker", "Audio out (I2S port 1)."],
         ["Button (the BOOT button works)", "Interrupts the assistant."],
-        ["LED (optional)", "Shows when the agent is listening."],
+        ["LED (optional)", "Lights up when the agent is listening."],
       ],
     ),
-    p(`Pin assignments live in ${ic("Config.h")}. Change them to match your wiring.`),
+    p(`Pin assignments are in ${ic("Config.h")}. Change them to match your wiring.`),
     hr,
     heading("h2", "build-the-voice-agent", "Build the voice agent"),
     heading("h3", "step-1-set-your-api-key-and-device-token", "Step 1: Set your API key and device token"),
-    p(`The device token is a shared secret between the ESP32 and your relay.`),
+    p(`The device token is a shared secret between the ESP32 and your edge server.`),
     await code(`export ASSEMBLYAI_API_KEY=<your-key>\nexport DEVICE_TOKEN=$(openssl rand -hex 16)`, "bash"),
-    heading("h3", "step-2-run-the-relay", "Step 2: Run the relay"),
-    p(`The relay is a single Deno file at ${ic("examples/esp32-realtime/server/main.ts")}. Run it locally, or deploy it to any Deno-compatible edge host to cut latency.`),
+    heading("h3", "step-2-run-the-edge-server", "Step 2: Run the edge server"),
+    p(`The server is one Deno file, ${ic("examples/esp32-realtime/server/main.ts")}. Run it locally, or deploy it to a Deno-compatible host close to your users.`),
     await code(`deno run -A examples/esp32-realtime/server/main.ts`, "bash"),
-    await code(server, "typescript"),
+    p(`It talks to three AssemblyAI endpoints. Every one authenticates with your API key.`),
+    await code(endpoints, "typescript"),
+    p(`STT stays open for the whole session. When a final turn arrives, the server forwards the transcript to the device and, if the agent is mid-reply, cuts it off first.`),
+    await code(sttLoop, "typescript"),
+    p(`Replies are handled one at a time: ask the LLM, then speak the answer.`),
+    await code(turnLoop, "typescript"),
     heading("h3", "step-3-flash-the-firmware", "Step 3: Flash the firmware"),
-    p(`Open ${ic("examples/esp32-realtime/firmware")} in PlatformIO. Set your Wi-Fi credentials, relay host, and the same ${ic("DEVICE_TOKEN")} in ${ic("Config.h")}.`),
-    await code(config, "cpp"),
-    await code(pio, "ini"),
-    await code(mainCpp, "cpp"),
+    p(`Open ${ic("examples/esp32-realtime/firmware")} in PlatformIO. In ${ic("Config.h")}, set your Wi-Fi credentials, the edge server host, and the same ${ic("DEVICE_TOKEN")}. Then flash:`),
     await code(`cd examples/esp32-realtime/firmware\npio run -t upload && pio device monitor`, "bash"),
+    p(`The firmware has two jobs. One task reads the mic and streams PCM16 to the server. The main loop drains a playback buffer into the speaker, and clears it on interrupt.`),
+    await code(firmwareIO, "cpp"),
     heading("h3", "step-4-talk-to-it", "Step 4: Talk to it"),
-    p(`When the serial monitor prints ${ic("relay connected")}, start speaking. Transcripts appear in the monitor and the reply plays through the speaker. Press the button, or just talk over it, to interrupt.`),
+    p(`When the serial monitor prints ${ic("server connected")}, start talking. Transcripts show up in the monitor and the reply plays through the speaker. Press the button, or talk over it, to interrupt.`),
     hr,
     heading("h2", "how-it-works", "How it works"),
     ul([
-      `<strong>Always listening.</strong> The STT socket stays open for the whole session. AssemblyAI's turn detection decides when you've finished (${ic("end_of_turn")}), so no push-to-talk is needed.`,
-      `<strong>One reply at a time.</strong> Final turns are queued. The relay calls LLM Gateway with the running history, then opens a TTS socket for each answer.`,
-      `<strong>Barge-in.</strong> If speech arrives while the agent is talking, or the button is pressed, the relay sends ${ic("Cancel")} to TTS and an ${ic("interrupt")} to the device, which clears its playback buffer immediately.`,
-      `<strong>Raw PCM.</strong> For clarity the example moves uncompressed PCM16, about 32 KB/s up and 48 KB/s down, which is fine on Wi-Fi. Elato compresses with Opus for weaker networks, and adding it is the main upgrade path.`,
+      `<strong>Always listening.</strong> The STT socket stays open for the whole session. AssemblyAI's turn detection decides when the user is done (${ic("end_of_turn")}), so there's no push-to-talk.`,
+      `<strong>One reply at a time.</strong> Final turns are queued. For each one the server calls LLM Gateway with the running history, then opens a TTS socket for the answer.`,
+      `<strong>Barge-in.</strong> If speech arrives while the agent is talking, or the button is pressed, the server sends ${ic("Cancel")} to TTS and an ${ic("interrupt")} to the device, which clears its playback buffer.`,
+      `<strong>Raw PCM.</strong> The example sends uncompressed PCM16, about 32 KB/s up and 48 KB/s down. That's fine on Wi-Fi. Elato uses Opus on weaker networks, and adding it is the main upgrade.`,
     ]),
     hr,
     heading("h2", "voice-agent-api-alternative", "Voice Agent API alternative"),
-    p(`Instead of chaining three APIs, the relay can open one WebSocket to the managed ${a("https://www.assemblyai.com/docs/voice-agents/voice-agent-api", "Voice Agent API")} and let AssemblyAI run the whole loop. Elato's server supports both, so you can choose per character.`),
+    p(`Instead of chaining three APIs, the edge server can open one WebSocket to the managed ${a("https://www.assemblyai.com/docs/voice-agents/voice-agent-api", "Voice Agent API")} and let AssemblyAI run the whole loop. Elato's backend supports both, so you can choose per character.`),
     table(
-      ["", "STT, LLM Gateway and TTS (this example)", "Voice Agent API"],
+      ["", "STT + LLM Gateway + TTS (this example)", "Voice Agent API"],
       [
         ["Connections", "Three: STT socket, LLM Gateway request, TTS socket", `One: ${ic("wss://agents.assemblyai.com/v1/ws")}`],
         ["Models", `You choose: ${ic("universal-3-6-pro")}, an LLM Gateway model, a TTS voice`, "Managed by AssemblyAI. You choose the voice and, optionally, a transcription mode."],
-        ["Turn-taking", `The relay reacts to ${ic("end_of_turn")}, then calls the LLM and TTS`, "Handled by AssemblyAI (semantic turn detection and barge-in)"],
+        ["Turn-taking", `The server reacts to ${ic("end_of_turn")}, then calls the LLM and TTS`, "Handled by AssemblyAI (semantic turn detection and barge-in)"],
         ["Audio", "16 kHz PCM16 in, 24 kHz PCM16 out", "24 kHz PCM in and out. Resample 16 kHz mic audio before sending."],
-        ["Tools", "You call tools yourself in the relay", `Declare them in ${ic("session.update")}, run them in the relay, and send the results back`],
-        ["Greeting", "The relay generates and speaks it", `The model composes it from a ${ic("reply.create")} instruction`],
-        ["Ending a call", "Close the sockets", `Send ${ic("session.end")} so the session is not billed for the reconnect grace window`],
+        ["Tools", "You call tools yourself in the server", `Declare them in ${ic("session.update")}, run them in the server, send the results back`],
+        ["Greeting", "The server generates and speaks it", `The model composes it from a ${ic("reply.create")} instruction`],
+        ["Ending a call", "Close the sockets", `Send ${ic("session.end")} so you aren't billed for the reconnect grace window`],
       ],
     ),
-    p(`The session is configured with one ${ic("session.update")} event: ${ic("system_prompt")}, ${ic("input.format")}, ${ic("output.voice")}, ${ic("output.format")}, and ${ic("tools")}. The voice and output format can't change after the first update, and the agent speaks English, Italian, Spanish, German, Portuguese and French. Your API key needs Voice Agent API access, not only streaming transcription. The Voice Agent API doesn't expose its STT, LLM or TTS models, so use the pipeline above if you need to pin or swap one.`),
+    p(`You configure the session with one ${ic("session.update")} event: ${ic("system_prompt")}, ${ic("input.format")}, ${ic("output.voice")}, ${ic("output.format")}, and ${ic("tools")}. The voice and output format can't change after the first update. The agent speaks English, Italian, Spanish, German, Portuguese and French. Your API key needs Voice Agent API access, not only streaming transcription. The Voice Agent API doesn't expose its STT, LLM or TTS models, so use the pipeline above if you need to pin or swap one.`),
     hr,
     heading("h2", "customize-and-extend", "Customize and extend"),
     ul([
       `Change the persona with ${ic("SYSTEM_PROMPT")}, the model with ${ic("LLM_MODEL")}, and the voice with ${ic("TTS_VOICE_ID")}.`,
-      `Add tool calls (timers, smart-home actions) to the LLM Gateway request and run them in the relay.`,
+      `Add tool calls (timers, smart-home actions) to the LLM Gateway request and run them in the server.`,
       `Add keyterms for your product names to the STT connection to improve recognition.`,
       `Use Elato's Next.js app and Supabase schema for device registration, characters, and conversation history.`,
-      `Deploy the relay close to your users. End-to-end latency includes Wi-Fi, network distance, model time, and playback, so measure on your hardware and region.`,
+      `Deploy the server near your users. End-to-end latency is Wi-Fi, network distance, model time, and playback, so measure on your hardware and region.`,
     ]),
     hr,
     heading("h2", "next-steps", "Next steps"),
     ul([
-      `${a(ELATO, "ElatoAI on GitHub")} — Firmware, Deno edge server, and web app this example builds on`,
-      `${a("https://www.assemblyai.com/docs/streaming/getting-started/transcribe-streaming-audio", "Real-time STT quickstart")} — Set up real-time transcription`,
+      `${a(ELATO, "ElatoAI on GitHub")} — Firmware, Deno edge server, and web app this example is built from`,
+      `${a("https://www.assemblyai.com/docs/streaming/getting-started/transcribe-streaming-audio", "Realtime STT quickstart")} — Set up realtime transcription`,
       `${a("https://www.assemblyai.com/docs/llm-gateway/quickstart", "LLM Gateway overview")} — Explore all available models and features`,
       `${a("https://developers.openai.com/cookbook/examples/voice_solutions/running_realtime_api_speech_on_esp32_arduino_edge_runtime_elatoai", "OpenAI Cookbook: Realtime API on ESP32 with Elato")} and ${a("https://www.boson.ai/blog/higgs-realtime-esp32", "Boson AI: Higgs Realtime on ESP32")} — The same Elato stack with other providers`,
     ]),
@@ -191,10 +207,10 @@ async function overviewContent() {
     callout(`Every example uses placeholder API keys (${ic("YOUR_API_KEY")}). Replace them with your actual key from the ${a("https://www.assemblyai.com/dashboard", "AssemblyAI dashboard")}.`),
     hr,
     heading("h2", "streaming-pipelines", "Streaming pipelines"),
-    p(`These pipelines use the Real-time STT API to process live audio, with LLM Gateway and Text to Speech.`),
+    p(`These pipelines use the Realtime STT API to process live audio, with LLM Gateway and Text to Speech.`),
     table(
       ["Pipeline", "Products used", "Best for"],
-      [[`<a href="${ESP32_PATH}" class="link">Real-time speech on ESP32</a>`, "Real-time STT + LLM Gateway + Text to Speech + Elato", "Voice toys, assistants, embedded devices"]],
+      [[`<a href="${ESP32_PATH}" class="link">Realtime speech on ESP32</a>`, "Realtime STT + LLM Gateway + Text to Speech + Elato", "Voice toys, assistants, embedded devices"]],
     ),
     hr,
     heading("h2", "customize-and-extend", "Customize and extend"),
@@ -207,7 +223,7 @@ async function overviewContent() {
     hr,
     heading("h2", "next-steps", "Next steps"),
     ul([
-      `${a("https://www.assemblyai.com/docs/streaming/getting-started/transcribe-streaming-audio", "Real-time STT quickstart")} — Set up real-time transcription`,
+      `${a("https://www.assemblyai.com/docs/streaming/getting-started/transcribe-streaming-audio", "Realtime STT quickstart")} — Set up realtime transcription`,
       `${a("https://www.assemblyai.com/docs/llm-gateway/quickstart", "LLM Gateway overview")} — Explore all available models and features`,
     ]),
   ].join("\n");
@@ -241,7 +257,7 @@ function build({ title, subtitle, path, content, toc, sidebarActiveChild, prev, 
   const ACTIVE = "bg-primary/10 text-primary [text-shadow:-0.2px_0_0_currentColor,0.2px_0_0_currentColor] dark:text-primary-light dark:bg-primary-light/10";
   const IDLE = "hover:bg-gray-600/5 dark:hover:bg-gray-200/5 text-gray-700 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300";
   let child = firstLi
-    .replaceAll("meeting-notetaker", "realtime-esp32").replaceAll("Meeting notetaker", "Real-time speech on ESP32")
+    .replaceAll("meeting-notetaker", "realtime-esp32").replaceAll("Meeting notetaker", "Realtime speech on ESP32")
     .replace(/href="[^"]*"/, `href="${ESP32_PATH}"`);
   if (sidebarActiveChild) {
     child = child.replace(IDLE, ACTIVE).replace("<a ", '<a data-active-nav-item="true" aria-current="page" ');
@@ -284,17 +300,17 @@ const esp32Toc = [
   ["overview", "Overview"], ["architecture", "Architecture"], ["hardware", "Hardware"],
   ["build-the-voice-agent", "Build the voice agent"],
   ["step-1-set-your-api-key-and-device-token", "Step 1: Set your API key and device token", 1],
-  ["step-2-run-the-relay", "Step 2: Run the relay", 1],
+  ["step-2-run-the-edge-server", "Step 2: Run the edge server", 1],
   ["step-3-flash-the-firmware", "Step 3: Flash the firmware", 1],
   ["step-4-talk-to-it", "Step 4: Talk to it", 1],
   ["how-it-works", "How it works"], ["customize-and-extend", "Customize and extend"], ["next-steps", "Next steps"],
 ];
 
 writeFileSync("content/realtime-esp32.html", build({
-  title: "Real-time speech on ESP32",
-  subtitle: "Run a voice agent on a $10 ESP32-S3 with AssemblyAI streaming Speech-to-Text, LLM Gateway, and Text to Speech, relayed through an Elato Deno edge server.",
+  title: "Realtime speech on ESP32",
+  subtitle: "Run a voice agent on a $10 ESP32-S3 with AssemblyAI streaming Speech-to-Text, LLM Gateway, and Text to Speech, through a Deno edge server.",
   path: ESP32_PATH, content: await esp32Content(), toc: esp32Toc, sidebarActiveChild: true,
-  prev: { href: "https://www.assemblyai.com/docs/getting-started/end-to-end-examples/real-time-live-captioner", title: "Real-time live captioner" }, next: null,
+  prev: { href: "https://www.assemblyai.com/docs/getting-started/end-to-end-examples/real-time-live-captioner", title: "Realtime live captioner" }, next: null,
 }));
 
 console.log("generated");
