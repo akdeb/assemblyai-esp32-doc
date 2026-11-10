@@ -2,7 +2,7 @@
 //
 // Edge relay between an ESP32 and AssemblyAI.
 //
-//   ESP32 mic --PCM16 16 kHz--> relay --> AssemblyAI Streaming STT (Universal-3 Pro)
+//   ESP32 mic --PCM16 16 kHz--> relay --> AssemblyAI Streaming STT (Universal-3.6 Pro)
 //                                  |--> LLM Gateway (chat completions)
 //   ESP32 spk <--PCM16 24 kHz-- relay <-- AssemblyAI TTS (WebSocket)
 //

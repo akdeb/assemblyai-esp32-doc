@@ -86,7 +86,7 @@ async function esp32Content() {
   const box = (w, rows) => ["┌" + "─".repeat(w) + "┐", ...rows.map((r) => "│" + pad(" " + r, w) + "│"), "└" + "─".repeat(w) + "┘"];
   const dev = box(14, ["INMP441 mic", "", "", "", "", "MAX98357A", "+ speaker"]);
   const relay = box(15, ["turn handling", "chat history", "barge-in", "", "API key lives", "here, not on", "the device"]);
-  const aai = box(18, ["Streaming STT", "Universal-3 Pro", "─────────────", "LLM Gateway", "─────────────", "Text to Speech", "AssemblyAI-TTS-1"]);
+  const aai = box(19, ["Streaming STT", "Universal-3.6 Pro", "─────────────", "LLM Gateway", "─────────────", "Text to Speech", "AssemblyAI-TTS-1"]);
   const g1 = ["", " 16kHz", "──────▶", "", "", "", "◀──────", " 24kHz", ""].map((t) => pad(t, 8));
   const g2 = ["", " wss", "─────▶", "◀─────", " https", "─────▶", "◀─────", " wss", ""].map((t) => pad(t, 7));
   const rows = dev.map((_, i) => dev[i] + g1[i] + relay[i] + g2[i] + aai[i]);
@@ -109,6 +109,7 @@ async function esp32Content() {
         ["Relay → TTS", `${ic("wss://tts.us.assemblyai.com/v1/ws")}`, `${ic("Generate")} and ${ic("Flush")} in, base64 PCM16 24 kHz out, ${ic("Cancel")} on barge-in.`],
       ],
     ),
+    callout(`This page builds the pipeline from separate AssemblyAI APIs (STT, LLM Gateway, Text to Speech), so you pick each model yourself: ${ic("universal-3-6-pro")} for STT, any LLM Gateway model through ${ic("LLM_MODEL")}, and a TTS voice. The relay also works with the managed Voice Agent API. See ${a("#voice-agent-api-alternative", "Voice Agent API alternative")}.`),
     hr,
     heading("h2", "hardware", "Hardware"),
     table(
@@ -147,6 +148,22 @@ async function esp32Content() {
       `<strong>Barge-in.</strong> If speech arrives while the agent is talking, or the button is pressed, the relay sends ${ic("Cancel")} to TTS and an ${ic("interrupt")} to the device, which clears its playback buffer immediately.`,
       `<strong>Raw PCM.</strong> For clarity the example moves uncompressed PCM16, about 32 KB/s up and 48 KB/s down, which is fine on Wi-Fi. Elato compresses with Opus for weaker networks, and adding it is the main upgrade path.`,
     ]),
+    hr,
+    heading("h2", "voice-agent-api-alternative", "Voice Agent API alternative"),
+    p(`Instead of chaining three APIs, the relay can open one WebSocket to the managed ${a("https://www.assemblyai.com/docs/voice-agents/voice-agent-api", "Voice Agent API")} and let AssemblyAI run the whole loop. Elato's server supports both, so you can choose per character.`),
+    table(
+      ["", "STT, LLM Gateway and TTS (this example)", "Voice Agent API"],
+      [
+        ["Connections", "Three: STT socket, LLM Gateway request, TTS socket", `One: ${ic("wss://agents.assemblyai.com/v1/ws")}`],
+        ["Models", `You choose: ${ic("universal-3-6-pro")}, an LLM Gateway model, a TTS voice`, "Managed by AssemblyAI. You choose the voice and, optionally, a transcription mode."],
+        ["Turn-taking", `The relay reacts to ${ic("end_of_turn")}, then calls the LLM and TTS`, "Handled by AssemblyAI (semantic turn detection and barge-in)"],
+        ["Audio", "16 kHz PCM16 in, 24 kHz PCM16 out", "24 kHz PCM in and out. Resample 16 kHz mic audio before sending."],
+        ["Tools", "You call tools yourself in the relay", `Declare them in ${ic("session.update")}, run them in the relay, and send the results back`],
+        ["Greeting", "The relay generates and speaks it", `The model composes it from a ${ic("reply.create")} instruction`],
+        ["Ending a call", "Close the sockets", `Send ${ic("session.end")} so the session is not billed for the reconnect grace window`],
+      ],
+    ),
+    p(`The session is configured with one ${ic("session.update")} event: ${ic("system_prompt")}, ${ic("input.format")}, ${ic("output.voice")}, ${ic("output.format")}, and ${ic("tools")}. The voice and output format can't change after the first update, and the agent speaks English, Italian, Spanish, German, Portuguese and French. Your API key needs Voice Agent API access, not only streaming transcription. The Voice Agent API doesn't expose its STT, LLM or TTS models, so use the pipeline above if you need to pin or swap one.`),
     hr,
     heading("h2", "customize-and-extend", "Customize and extend"),
     ul([
