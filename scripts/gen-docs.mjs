@@ -105,8 +105,8 @@ async function esp32Content() {
 
   return [
     heading("h2", "overview", "Overview"),
-    p(`An ESP32-S3 can't run a speech model, so it doesn't try. It streams microphone audio up and plays audio back. A small Deno edge server in the middle does the rest: it pipes the audio into AssemblyAI streaming Speech-to-Text, waits for the end of the user's turn, sends the conversation to LLM Gateway, and streams the reply back through Text to Speech. Talk over the agent, or press the button, and playback stops immediately.`),
-    p(`This is Elato's architecture: Elato's ESP32 firmware talking to Elato's Deno edge server, with ${a(ELATO, "ElatoAI")} as the open-source reference. This page is a minimal, standalone cut of it with AssemblyAI as the speech provider.`),
+    p(`An ESP32-S3 can't run a speech model, so it doesn't try. The board streams microphone audio to a small Deno edge server and plays back whatever audio comes back. The server does the rest: it feeds your speech to AssemblyAI streaming Speech-to-Text, waits for the end of your turn, asks LLM Gateway for a reply, and speaks it with Text to Speech. Talk over the agent, or press the button, and playback stops immediately.`),
+    p(`The design comes from ${a(ELATO, "Elato")}, an open-source stack for building talking ESP32 devices, created by Akash Deb. The full Elato project ships ESP32 firmware, a Deno edge server, a Next.js app and Supabase, and works with 100+ voice models. The code on this page is a minimal version of it with AssemblyAI as the speech provider, small enough to read in one sitting.`),
     `<div style="display:flex;justify-content:center;margin:1.5rem 0"><iframe src="https://www.youtube.com/embed/FAm6QM6FgiA" title="AssemblyAI voice agent on ESP32 demo" style="width:100%;max-width:340px;aspect-ratio:9/16;border:0;border-radius:12px" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>`,
     callout(`Set ${ic("ASSEMBLYAI_API_KEY")} on the edge server only. The key never touches the device. Get one from the ${a("https://www.assemblyai.com/dashboard", "AssemblyAI dashboard")}.`),
     hr,
@@ -162,11 +162,27 @@ async function esp32Content() {
       `<strong>Always listening.</strong> The STT socket stays open for the whole session. AssemblyAI's turn detection decides when the user is done (${ic("end_of_turn")}), so there's no push-to-talk.`,
       `<strong>One reply at a time.</strong> Final turns are queued. For each one the server calls LLM Gateway with the running history, then opens a TTS socket for the answer.`,
       `<strong>Barge-in.</strong> If speech arrives while the agent is talking, or the button is pressed, the server sends ${ic("Cancel")} to TTS and an ${ic("interrupt")} to the device, which clears its playback buffer.`,
-      `<strong>Raw PCM.</strong> The example sends uncompressed PCM16, about 32 KB/s up and 48 KB/s down. That's fine on Wi-Fi. Elato uses Opus on weaker networks, and adding it is the main upgrade.`,
+      `<strong>Raw PCM.</strong> The example sends uncompressed PCM16, about 32 KB/s up and 48 KB/s down. That's fine on Wi-Fi. Elato's firmware compresses audio with Opus, and adding it here is the main upgrade if your network is weak.`,
+    ]),
+    hr,
+    heading("h2", "limitations-and-troubleshooting", "Limitations and troubleshooting"),
+    p(`Akash Deb, founder of ${a(ELATO, "Elato")}, has run this design on real devices and documents where it falls short:`),
+    ul([
+      `<strong>Cold starts.</strong> Connecting to a freshly started edge server takes about 2 to 3 seconds.`,
+      `<strong>Response time.</strong> Elato reports roughly two to three seconds end to end across its global stack. That covers Wi-Fi, network distance, model time and playback, so measure on your own hardware and region.`,
+      `<strong>Session length.</strong> Edge hosts end a connection when their wall-clock limit is reached. Elato has tested up to 17 minutes of uninterrupted conversation.`,
+      `<strong>Interruptions.</strong> The ESP32 doesn't detect speech itself. It stops playing only when the server sends ${ic("interrupt")} or you press the button.`,
+    ]),
+    p(`Two more limits are specific to this example. It sends raw PCM, so it needs a steady Wi-Fi link. And ${ic("DEVICE_TOKEN")} is one shared secret for every device, which is fine for a prototype. Give each device its own credentials before you ship, as Elato does with its Supabase device registration.`),
+    p(`If something doesn't work, isolate one half at a time:`),
+    ul([
+      `<strong>Speaker is silent.</strong> Before you debug the voice pipeline, get a small internet-radio sketch playing through the MAX98357A on its own. If the radio plays, your wiring and I2S pins are fine and the problem is in the audio stream. If it doesn't, recheck the pins in ${ic("Config.h")}.`,
+      `<strong>Mic isn't working.</strong> Try a local LAN server first. Run the edge server on your computer, join the same Wi-Fi, and in ${ic("main.cpp")} replace ${ic("ws.beginSSL(RELAY_HOST, RELAY_PORT, ...)")} with ${ic("ws.begin(<your computer's IP>, 8000, ...)")}. Once your transcripts show up in the serial monitor, move to a hosted server.`,
+      `<strong>Stuck connecting.</strong> Power-cycle the board after you change Wi-Fi credentials, and check that ${ic("DEVICE_TOKEN")} matches on the device and the server.`,
     ]),
     hr,
     heading("h2", "voice-agent-api-alternative", "Voice Agent API alternative"),
-    p(`Instead of chaining three APIs, the edge server can open one WebSocket to the managed ${a("https://www.assemblyai.com/docs/voice-agents/voice-agent-api", "Voice Agent API")} and let AssemblyAI run the whole loop. Elato's backend supports both, so you can choose per character.`),
+    p(`Instead of chaining three APIs, the edge server can open one WebSocket to the managed ${a("https://www.assemblyai.com/docs/voice-agents/voice-agent-api", "Voice Agent API")} and let AssemblyAI run the whole loop. Elato supports both, so you can choose per character.`),
     table(
       ["", "STT + LLM Gateway + TTS (this example)", "Voice Agent API"],
       [
@@ -186,16 +202,16 @@ async function esp32Content() {
       `Change the persona with ${ic("SYSTEM_PROMPT")}, the model with ${ic("LLM_MODEL")}, and the voice with ${ic("TTS_VOICE_ID")}.`,
       `Add tool calls (timers, smart-home actions) to the LLM Gateway request and run them in the server.`,
       `Add keyterms for your product names to the STT connection to improve recognition.`,
-      `Use Elato's Next.js app and Supabase schema for device registration, characters, and conversation history.`,
+      `Use the full Elato project for the Next.js app and Supabase schema that handle device registration, characters, and conversation history.`,
       `Deploy the server near your users. End-to-end latency is Wi-Fi, network distance, model time, and playback, so measure on your hardware and region.`,
     ]),
     hr,
     heading("h2", "next-steps", "Next steps"),
     ul([
-      `${a(ELATO, "ElatoAI on GitHub")} — Firmware, Deno edge server, and web app this example is built from`,
+      `${a(ELATO, "ElatoAI on GitHub")} — The full open-source project: firmware, Deno edge server, and web app`,
       `${a("https://www.assemblyai.com/docs/streaming/getting-started/transcribe-streaming-audio", "Realtime STT quickstart")} — Set up realtime transcription`,
       `${a("https://www.assemblyai.com/docs/llm-gateway/quickstart", "LLM Gateway overview")} — Explore all available models and features`,
-      `${a("https://developers.openai.com/cookbook/examples/voice_solutions/running_realtime_api_speech_on_esp32_arduino_edge_runtime_elatoai", "OpenAI Cookbook: Realtime API on ESP32 with Elato")} and ${a("https://www.boson.ai/blog/higgs-realtime-esp32", "Boson AI: Higgs Realtime on ESP32")} — The same Elato stack with other providers`,
+      `${a("https://developers.openai.com/cookbook/examples/voice_solutions/running_realtime_api_speech_on_esp32_arduino_edge_runtime_elatoai", "OpenAI Cookbook: Realtime API on ESP32 with Elato")} and ${a("https://www.boson.ai/blog/higgs-realtime-esp32", "Boson AI: Higgs Realtime on ESP32")} — The Elato stack running on OpenAI's Realtime API and on Boson's Higgs Realtime`,
     ]),
   ].join("\n");
 }
@@ -303,12 +319,12 @@ const esp32Toc = [
   ["step-2-run-the-edge-server", "Step 2: Run the edge server", 1],
   ["step-3-flash-the-firmware", "Step 3: Flash the firmware", 1],
   ["step-4-talk-to-it", "Step 4: Talk to it", 1],
-  ["how-it-works", "How it works"], ["customize-and-extend", "Customize and extend"], ["next-steps", "Next steps"],
+  ["how-it-works", "How it works"], ["limitations-and-troubleshooting", "Limitations and troubleshooting"], ["customize-and-extend", "Customize and extend"], ["next-steps", "Next steps"],
 ];
 
 writeFileSync("content/realtime-esp32.html", build({
   title: "Realtime speech on ESP32",
-  subtitle: "Run a voice agent on a $10 ESP32-S3 with AssemblyAI streaming Speech-to-Text, LLM Gateway, and Text to Speech, through a Deno edge server.",
+  subtitle: "Build a talking ESP32-S3 device with Elato, the open-source voice AI stack, powered by AssemblyAI streaming Speech-to-Text, LLM Gateway, and Text to Speech.",
   path: ESP32_PATH, content: await esp32Content(), toc: esp32Toc, sidebarActiveChild: true,
   prev: { href: "https://www.assemblyai.com/docs/getting-started/end-to-end-examples/real-time-live-captioner", title: "Realtime live captioner" }, next: null,
 }));
