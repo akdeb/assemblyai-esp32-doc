@@ -1,8 +1,8 @@
 import { DocsPage } from "@/components/DocsPage";
 
 export const metadata = {
-  title: "Realtime speech on ESP32 - AssemblyAI",
-  description: "Build a talking ESP32-S3 device with Elato, the open-source voice AI stack, powered by AssemblyAI streaming STT, LLM Gateway, and Text to Speech.",
+  title: "[WIP] Realtime speech on ESP32 - AssemblyAI",
+  description: "Build a voice agent on a $10 ESP32-S3 with Elato and AssemblyAI streaming STT, LLM Gateway, and Text to Speech.",
 };
 
 export default function Page() {

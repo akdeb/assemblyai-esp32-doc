@@ -11,6 +11,7 @@ const read = (p) => readFileSync(`examples/esp32-realtime/${p}`, "utf8");
 const ESP32_PATH = "/docs/getting-started/end-to-end-examples/realtime-esp32";
 const E2E_PATH = "/docs/getting-started/end-to-end-examples";
 const ELATO = "https://github.com/akdeb/ElatoAI";
+const PAGE_TITLE = "[WIP] Realtime speech on ESP32";
 
 // ---------- template pieces lifted from the real pages ----------
 const esc = (s) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
@@ -105,8 +106,8 @@ async function esp32Content() {
 
   return [
     heading("h2", "overview", "Overview"),
-    p(`An ESP32-S3 can't run a speech model, so it doesn't try. The board streams microphone audio to a small Deno edge server and plays back whatever audio comes back. The server does the rest: it feeds your speech to AssemblyAI streaming Speech-to-Text, waits for the end of your turn, asks LLM Gateway for a reply, and speaks it with Text to Speech. Talk over the agent, or press the button, and playback stops immediately.`),
-    p(`The design comes from ${a(ELATO, "Elato")}, an open-source stack for building talking ESP32 devices, created by Akash Deb. The full Elato project ships ESP32 firmware, a Deno edge server, a Next.js app and Supabase, and works with 100+ voice models. The code on this page is a minimal version of it with AssemblyAI as the speech provider, small enough to read in one sitting.`),
+    p(`This guide builds a voice agent on an ESP32-S3 with a microphone and a speaker. You talk, it answers. AssemblyAI handles the speech-to-text, the LLM reply through LLM Gateway, and the text-to-speech. The ESP32 only streams audio to and from a small Deno edge server, and the server talks to AssemblyAI. You can interrupt the agent at any time by talking over it or pressing the button.`),
+    p(`The design comes from ${a(ELATO, "Elato")}, an open-source stack for building talking ESP32 devices. The full Elato project ships ESP32 firmware, a Deno edge server, a Next.js app and Supabase, and works with 100+ voice models. The code on this page is a minimal version of it with AssemblyAI as the speech provider, small enough to read in one sitting.`),
     `<div style="display:flex;justify-content:center;margin:1.5rem 0"><iframe src="https://www.youtube.com/embed/FAm6QM6FgiA" title="AssemblyAI voice agent on ESP32 demo" style="width:100%;max-width:340px;aspect-ratio:9/16;border:0;border-radius:12px" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>`,
     callout(`Set ${ic("ASSEMBLYAI_API_KEY")} on the edge server only. The key never touches the device. Get one from the ${a("https://www.assemblyai.com/dashboard", "AssemblyAI dashboard")}.`),
     hr,
@@ -166,10 +167,10 @@ async function esp32Content() {
     ]),
     hr,
     heading("h2", "limitations-and-troubleshooting", "Limitations and troubleshooting"),
-    p(`Akash Deb, founder of ${a(ELATO, "Elato")}, has run this design on real devices and documents where it falls short:`),
+    p(`After running this design and the ${a(ELATO, "Elato")} framework on hundreds of ESP32 devices, these were the limits documented by Akash Deb, founder of Elato:`),
     ul([
       `<strong>Cold starts.</strong> Connecting to a freshly started edge server takes about 2 to 3 seconds.`,
-      `<strong>Response time.</strong> Elato reports roughly two to three seconds end to end across its global stack. That covers Wi-Fi, network distance, model time and playback, so measure on your own hardware and region.`,
+      `<strong>Response time.</strong> About 1 second end to end, which is fast. That covers Wi-Fi, network distance, model time and playback, so yours will vary with your hardware, region and LLM. Measure it on your own setup.`,
       `<strong>Session length.</strong> Edge hosts end a connection when their wall-clock limit is reached. Elato has tested up to 17 minutes of uninterrupted conversation.`,
       `<strong>Interruptions.</strong> The ESP32 doesn't detect speech itself. It stops playing only when the server sends ${ic("interrupt")} or you press the button.`,
     ]),
@@ -226,7 +227,7 @@ async function overviewContent() {
     p(`These pipelines use the Realtime STT API to process live audio, with LLM Gateway and Text to Speech.`),
     table(
       ["Pipeline", "Products used", "Best for"],
-      [[`<a href="${ESP32_PATH}" class="link">Realtime speech on ESP32</a>`, "Realtime STT + LLM Gateway + Text to Speech + Elato", "Voice toys, assistants, embedded devices"]],
+      [[`<a href="${ESP32_PATH}" class="link">${PAGE_TITLE}</a>`, "Realtime STT + LLM Gateway + Text to Speech + Elato", "Voice toys, assistants, embedded devices"]],
     ),
     hr,
     heading("h2", "customize-and-extend", "Customize and extend"),
@@ -273,7 +274,7 @@ function build({ title, subtitle, path, content, toc, sidebarActiveChild, prev, 
   const ACTIVE = "bg-primary/10 text-primary [text-shadow:-0.2px_0_0_currentColor,0.2px_0_0_currentColor] dark:text-primary-light dark:bg-primary-light/10";
   const IDLE = "hover:bg-gray-600/5 dark:hover:bg-gray-200/5 text-gray-700 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300";
   let child = firstLi
-    .replaceAll("meeting-notetaker", "realtime-esp32").replaceAll("Meeting notetaker", "Realtime speech on ESP32")
+    .replaceAll("meeting-notetaker", "realtime-esp32").replaceAll("Meeting notetaker", PAGE_TITLE)
     .replace(/href="[^"]*"/, `href="${ESP32_PATH}"`);
   if (sidebarActiveChild) {
     child = child.replace(IDLE, ACTIVE).replace("<a ", '<a data-active-nav-item="true" aria-current="page" ');
@@ -323,8 +324,8 @@ const esp32Toc = [
 ];
 
 writeFileSync("content/realtime-esp32.html", build({
-  title: "Realtime speech on ESP32",
-  subtitle: "Build a talking ESP32-S3 device with Elato, the open-source voice AI stack, powered by AssemblyAI streaming Speech-to-Text, LLM Gateway, and Text to Speech.",
+  title: PAGE_TITLE,
+  subtitle: "Build a voice agent on a $10 ESP32-S3 with Elato and AssemblyAI streaming Speech-to-Text, LLM Gateway, and Text to Speech.",
   path: ESP32_PATH, content: await esp32Content(), toc: esp32Toc, sidebarActiveChild: true,
   prev: { href: "https://www.assemblyai.com/docs/getting-started/end-to-end-examples/real-time-live-captioner", title: "Realtime live captioner" }, next: null,
 }));
