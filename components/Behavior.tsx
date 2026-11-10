@@ -34,8 +34,18 @@ export function Behavior() {
       const nh = navbar ? navbar.offsetHeight - bh : 96;
       root.style.setProperty("--mintlify-slot-header-height", `${Math.max(nh, 0)}px`);
     };
+    // keep the fixed "Ask a question" bar lined up with the article column
+    const alignBar = () => {
+      const col = document.getElementById("content-area");
+      if (!col) return;
+      const r = col.getBoundingClientRect();
+      root.style.setProperty("--assistant-left", `${r.left}px`);
+      root.style.setProperty("--assistant-width", `${r.width}px`);
+    };
+    alignBar();
+    window.addEventListener("resize", alignBar);
     setVars();
-    const ro = new ResizeObserver(setVars);
+    const ro = new ResizeObserver(() => { setVars(); alignBar(); });
     if (banner) ro.observe(banner);
     if (navbar) ro.observe(navbar);
 
@@ -77,6 +87,7 @@ export function Behavior() {
 
     return () => {
       ro.disconnect();
+      window.removeEventListener("resize", alignBar);
       mq.removeEventListener("change", onMq);
       document.removeEventListener("click", onClick);
       window.removeEventListener("scroll", spyToc);
