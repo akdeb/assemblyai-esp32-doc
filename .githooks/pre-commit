@@ -1,0 +1,16 @@
+#!/bin/sh
+# The site serves content/realtime-esp32.html, which is generated from content/realtime-esp32.md.
+# Regenerate it whenever the doc source changes so the two can't drift apart.
+# Skip with: git commit --no-verify
+
+changed=$(git diff --cached --name-only | grep -E '^(content/realtime-esp32\.md|scripts/gen-docs\.mjs)$')
+[ -z "$changed" ] && exit 0
+
+echo "pre-commit: regenerating content/realtime-esp32.html"
+if ! node scripts/gen-docs.mjs; then
+  echo "pre-commit: gen-docs failed, so the HTML would be stale." >&2
+  echo "  It reads code from an ElatoAI checkout at ../../ElatoAI (or set ELATO_DIR)." >&2
+  echo "  Fix that, or commit with --no-verify to skip." >&2
+  exit 1
+fi
+git add content/realtime-esp32.html

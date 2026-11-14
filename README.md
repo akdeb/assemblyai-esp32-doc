@@ -14,5 +14,7 @@ npm install && npm run dev      # http://localhost:3000  (redirects to the ESP32
   (`reference/*.html`) and pulls code excerpts and pin numbers from a checkout of
   [ElatoAI](https://github.com/akdeb/ElatoAI) (expected at `../../ElatoAI`, or set `ELATO_DIR`). Run `node scripts/gen-docs.mjs` after editing the
   Markdown or the example code. Don't edit the generated `.html`.
+  The site serves that HTML, so it has to be committed. A pre-commit hook (`.githooks/`, enabled by `npm install`)
+  regenerates and stages it whenever you commit the Markdown.
 
 The copied stylesheet, fonts and logos under `public/` belong to AssemblyAI: for local preview only.
