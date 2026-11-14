@@ -94,6 +94,48 @@ async function esp32Content() {
     if (!m) throw new Error(`pin not found in Config.h: ${name}`);
     return `GPIO ${m[1]} (${ic(name)})`;
   };
+  const gpio = (name) => `GPIO${config.match(new RegExp(`^#define ${name} (\\d+)`, "m"))[1]}`;
+
+  // Wiring diagram as inline SVG. Pin numbers come from Config.h. Text and outlines use
+  // currentColor so it follows the docs' light and dark themes.
+  const C = { pwr: "#e5484d", gnd: "#8b8d98", clk: "#3e63dd", ws: "#30a46c", data: "#f76b15" };
+  const wire = (x1, y1, x2, y2, c) => `<path d="M${x1} ${y1}H${x2}${y1 === y2 ? "" : `V${y2}`}" stroke="${c}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+  const modBox = (x, y, w, h, title, sub) =>
+    `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10" fill="currentColor" fill-opacity=".04" stroke="currentColor" stroke-opacity=".35" stroke-width="1.5"/>` +
+    `<text x="${x + w / 2}" y="${y + 24}" text-anchor="middle" font-size="15" font-weight="600" fill="currentColor">${title}</text>` +
+    (sub ? `<text x="${x + w / 2}" y="${y + 42}" text-anchor="middle" font-size="11.5" fill="currentColor" fill-opacity=".6">${sub}</text>` : "");
+  const row = (y, mod, modSide, esp, espSide, c, dot) => {
+    const [mx, ex] = [modSide, espSide];
+    return wire(mx, y, ex, y, c) +
+      `<circle cx="${mx}" cy="${y}" r="4.5" fill="${c}"/><circle cx="${ex}" cy="${y}" r="4.5" fill="${c}"/>` +
+      `<text x="${mx + (mx < ex ? -12 : 12)}" y="${y + 4.5}" text-anchor="${mx < ex ? "end" : "start"}" font-size="13" fill="currentColor">${mod}</text>` +
+      `<text x="${ex + (mx < ex ? 12 : -12)}" y="${y + 4.5}" text-anchor="${mx < ex ? "start" : "end"}" font-size="13" font-weight="600" fill="currentColor">${esp}</text>`;
+  };
+  const MX = 200, EL = 360, ER = 600, AX = 760; // mic right edge, ESP left/right edge, amp left edge
+  const legend = [["3.3 V / 5 V power", C.pwr], ["Ground", C.gnd], ["Bit clock", C.clk], ["Word select", C.ws], ["Audio data", C.data]]
+    .map(([t, c], i) => `<line x1="${150 + i * 150}" y1="512" x2="${176 + i * 150}" y2="512" stroke="${c}" stroke-width="3" stroke-linecap="round"/><text x="${184 + i * 150}" y="516.5" font-size="12" fill="currentColor" fill-opacity=".75">${t}</text>`).join("");
+  const wiringSvg = `<div style="margin:1.5rem 0;overflow-x:auto"><svg viewBox="0 0 960 535" role="img" aria-label="Wiring diagram: INMP441 microphone on the left and MAX98357A amplifier with speaker on the right, both connected to the ESP32-S3 in the middle" style="width:100%;min-width:720px;height:auto;font-family:inherit">` +
+    modBox(30, 70, 170, 280, "INMP441", "I2S microphone") +
+    modBox(EL, 40, ER - EL, 380, "ESP32-S3", "dev board") +
+    modBox(AX, 70, 170, 280, "MAX98357A", "I2S amplifier") +
+    row(130, "VDD", MX, "3V3", EL, C.pwr) +
+    row(170, "GND", MX, "GND", EL, C.gnd) +
+    row(210, "L/R", MX, "", EL, C.gnd).replace(/<path[^>]*\/>/, "").replace(/<circle cx="360"[^>]*\/>/, "") +
+    `<path d="M${MX} 210H280V170" stroke="${C.gnd}" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="280" cy="170" r="4.5" fill="${C.gnd}"/>` +
+    row(260, "SCK", MX, gpio("MIC_BCLK"), EL, C.clk) +
+    row(300, "WS", MX, gpio("MIC_WS"), EL, C.ws) +
+    row(340, "SD", MX, gpio("MIC_DIN"), EL, C.data) +
+    row(130, "VIN", AX, "5V", ER, C.pwr) +
+    row(170, "GND", AX, "GND", ER, C.gnd) +
+    row(260, "BCLK", AX, gpio("SPK_BCLK"), ER, C.clk) +
+    row(300, "LRC", AX, gpio("SPK_WS"), ER, C.ws) +
+    row(340, "DIN", AX, gpio("SPK_DOUT"), ER, C.data) +
+    `<text x="${(EL + ER) / 2}" y="375" text-anchor="middle" font-size="12.5" fill="currentColor" fill-opacity=".75">BOOT button · ${gpio("BUTTON_PIN")}</text>` +
+    `<text x="${(EL + ER) / 2}" y="397" text-anchor="middle" font-size="12.5" fill="currentColor" fill-opacity=".75">LED · ${gpio("LED_PIN")} (on-board)</text>` +
+    // speaker
+    modBox(AX, 410, 170, 62, "Speaker", "4 or 8 Ω") +
+    [[815, "+"], [875, "−"]].map(([x, t]) => `<path d="M${x} 350V410" stroke="currentColor" stroke-opacity=".7" stroke-width="3" fill="none"/><circle cx="${x}" cy="350" r="4.5" fill="currentColor" fill-opacity=".7"/><circle cx="${x}" cy="410" r="4.5" fill="currentColor" fill-opacity=".7"/><text x="${x + (t === "+" ? -12 : 12)}" y="384" text-anchor="${t === "+" ? "end" : "start"}" font-size="14" fill="currentColor">${t}</text>`).join("") +
+    legend + `</svg></div>`;
   const localConfig = between(config, "// --- Wi-Fi", "// Hosted server");
   const connect = between(mainCpp, "#if RELAY_TLS", "  ws.onEvent(onEvent);");
 
@@ -146,6 +188,7 @@ async function esp32Content() {
     ),
     heading("h3", "wiring", "Wiring"),
     p(`Wire the two I2S boards to the ESP32-S3 as below. These are the defaults in ${ic("Config.h")}. If you use other pins, change them there.`),
+    wiringSvg,
     table(
       ["Module", "Module pin", "ESP32-S3 pin", "Notes"],
       [
