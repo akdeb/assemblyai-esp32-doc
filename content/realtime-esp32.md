@@ -109,7 +109,7 @@ git clone https://github.com/akdeb/ElatoAI.git assemblyai-esp32
 cd assemblyai-esp32
 ```
 
-From here on, we'll run everything from the root of this repo. For full setup, firmware flashing and frontend quickstart details, see the [ElatoAI quickstart](https://www.elatoai.com/docs/quickstart).
+From here on, we'll run everything from the root of this repo. For full setup, firmware flashing and frontend quickstart details, see the [quickstart docs](https://www.elatoai.com/docs/quickstart).
 
 ### Step 2: Set your AssemblyAI API key
 
