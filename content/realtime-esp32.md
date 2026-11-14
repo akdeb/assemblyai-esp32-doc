@@ -23,11 +23,11 @@ Do not edit content/realtime-esp32.html. It is generated and gets overwritten.
 
 ## Overview
 
-In this guide we'll learn how to build a conversational AI interface with the ESP32-S3 and AssemblyAI. We'll use the ESP32-S3 because it's a powerful microcontroller that can run a voice agent over secure WebSockets with a Deno Edge Server relay between our latest ASR, LLM Gateway, and TTS models.
+In this guide we'll learn how to build conversational AI agents with the ESP32-S3 and AssemblyAI. We'll use the ESP32-S3 because it's a powerful, low-cost, low-power microcontroller that can run a voice agent over secure WebSockets with a Deno Edge Server relay between our latest ASR, LLM Gateway, and TTS models.
 
 We'll build our voice agent on an ESP32-S3 with an INMP441 MEMS microphone and a MAX98357A amplifier and speaker. You talk into the mic where PCM16 audio is sampled at 16kHz and relayed via WebSockets to a Deno edge server and the AI speech plays out of the speaker at 24kHz.
 
-We'll use the voice agent architecture design from [ElatoAI](https://github.com/akdeb/ElatoAI), an open-source project for building conversational AI interfaces on ESP32 devices. The full Elato project ships ESP32 firmware, a Deno edge server, a Next.js app with Supabase DB. AssemblyAI handles the speech-to-text, the LLM reply through LLM Gateway, and the text-to-speech. You can also interrupt the agent at any time by pressing a dedicated button or touchpad. The project's AssemblyAI managed Voice Agent API server files are available on GitHub at [ElatoAI](https://github.com/akdeb/ElatoAI). Let's dive in! 
+We'll use the voice agent architecture design from [ElatoAI](https://github.com/akdeb/ElatoAI), an open-source project for building conversational AI interfaces on ESP32 devices. The full Elato project ships ESP32 firmware, a Deno edge server, a Next.js app with Supabase DB. AssemblyAI handles the speech-to-text, the LLM reply through LLM Gateway, and the text-to-speech. You can also interrupt the agent at any time by pressing a dedicated button or touchpad. The project's AssemblyAI managed Voice Agent API server files are available on GitHub at [ElatoAI](https://github.com/akdeb/ElatoAI). Let's dive in!
 
 <div style="display:flex;justify-content:center;margin:1.5rem 0"><iframe src="https://www.youtube.com/embed/FAm6QM6FgiA" title="AssemblyAI voice agent on ESP32 demo" style="width:100%;max-width:340px;aspect-ratio:9/16;border:0;border-radius:12px" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>
 
