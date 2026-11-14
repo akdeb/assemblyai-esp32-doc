@@ -1,7 +1,7 @@
 import { DocsPage } from "@/components/DocsPage";
 
 export const metadata = {
-  title: "[WIP] Realtime speech on ESP32 - AssemblyAI",
+  title: "Realtime speech on ESP32 - AssemblyAI",
   description: "Build a voice agent on a $10 ESP32-S3 with Elato and AssemblyAI streaming STT, LLM Gateway, and Text to Speech.",
 };
 

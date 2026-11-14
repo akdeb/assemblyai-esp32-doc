@@ -11,7 +11,7 @@ const read = (p) => readFileSync(`examples/esp32-realtime/${p}`, "utf8");
 const ESP32_PATH = "/docs/getting-started/end-to-end-examples/realtime-esp32";
 const E2E_PATH = "/docs/getting-started/end-to-end-examples";
 const ELATO = "https://github.com/akdeb/ElatoAI";
-const PAGE_TITLE = "[WIP] Realtime speech on ESP32";
+const PAGE_TITLE = "Realtime speech on ESP32";
 
 // ---------- template pieces lifted from the real pages ----------
 const esc = (s) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
