@@ -27,7 +27,7 @@ In this guide we'll learn how to build conversational AI agents with the ESP32-S
 
 We'll build our voice agent on an ESP32-S3 with an INMP441 MEMS microphone and a MAX98357A amplifier and speaker. You talk into the mic where PCM16 audio is sampled at 16kHz and relayed via WebSockets to a Deno edge server and the AI speech plays out of the speaker at 24kHz.
 
-We'll use the voice agent architecture design from [ElatoAI](https://github.com/akdeb/ElatoAI), an open-source project for building conversational AI interfaces on ESP32 devices. The full Elato project ships ESP32 firmware, a Deno edge server, a Next.js app with Supabase DB. AssemblyAI handles the speech-to-text, the LLM reply through LLM Gateway, and the text-to-speech. You can also interrupt the agent at any time by pressing a dedicated button or touchpad. The project's AssemblyAI managed Voice Agent API server files are available on GitHub at [ElatoAI](https://github.com/akdeb/ElatoAI). Let's dive in!
+We'll use the voice agent architecture design from [ElatoAI](https://github.com/akdeb/ElatoAI), an open-source project for building conversational AI interfaces on ESP32 devices. The full project ships ESP32 firmware, a Deno edge server, a Next.js app with Supabase DB. AssemblyAI handles the speech-to-text, the LLM reply through LLM Gateway, and the text-to-speech. You can also interrupt the agent at any time by pressing a dedicated button or touchpad. The project's AssemblyAI managed Voice Agent API server files are available on [GitHub](https://github.com/akdeb/ElatoAI). Let's dive in!
 
 <div style="display:flex;justify-content:center;margin:1.5rem 0"><iframe src="https://www.youtube.com/embed/FAm6QM6FgiA" title="AssemblyAI voice agent on ESP32 demo" style="width:100%;max-width:340px;aspect-ratio:9/16;border:0;border-radius:12px" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>
 
@@ -74,7 +74,7 @@ Here's what we need:
 
 Let's wire the boards to the ESP32-S3. The pin numbers below are the defaults in `firmware-arduino/src/Config.cpp`, so if you use other pins, change them there.
 
-<figure style="margin:1.5rem 0"><img src="/assets/wiring-diagram.png" alt="Wiring diagram: INMP441 microphone, MAX98357A amplifier with speaker, button and LED connected to an ESP32-S3 board" style="width:100%;height:auto;border-radius:12px" loading="lazy"/><figcaption style="margin-top:.5rem;font-size:.875rem;opacity:.7">Wiring for the ElatoAI firmware. Red is power, black is ground, green is signal.</figcaption></figure>
+<figure style="margin:1.5rem 0"><img src="/assets/wiring-diagram.png" alt="Wiring diagram: INMP441 microphone, MAX98357A amplifier with speaker, button and LED connected to an ESP32-S3 board" style="width:100%;height:auto;border-radius:12px" loading="lazy"/><figcaption style="margin-top:.5rem;font-size:.875rem;opacity:.7">Wiring for the ElatoAI firmware with a starter conversational AI board. Red is power, black is ground, green is signal.</figcaption></figure>
 
 | Module | Module pin | ESP32-S3 pin | Notes |
 | --- | --- | --- | --- |
@@ -105,8 +105,8 @@ The mic and the amp use separate I2S ports, so they don't share clock pins. Keep
 ### Step 1: Clone the repo
 
 ```bash
-git clone https://github.com/akdeb/ElatoAI.git
-cd ElatoAI
+git clone https://github.com/akdeb/ElatoAI.git assemblyai-esp32
+cd assemblyai-esp32
 ```
 
 From here on, we'll run everything from the root of this repo. For full setup, firmware flashing and frontend quickstart details, see the [ElatoAI quickstart](https://www.elatoai.com/docs/quickstart).
@@ -201,8 +201,6 @@ The architecture stays the same. The device still talks to the same edge server,
 | Turn-taking | Handled by AssemblyAI | The server reacts to `end_of_turn`, then calls the LLM and TTS |
 | Audio | 24 kHz PCM in and out | 16 kHz PCM16 in to STT, 24 kHz PCM16 out of TTS |
 | Ending a call | `session.end` | The server terminates the STT and TTS sockets |
-
-> [!NOTE] The pipeline provider isn't part of ElatoAI's AssemblyAI support, so we'll add it ourselves. The full provider file is [on GitHub](https://github.com/akdeb/ElatoAI/blob/cac6dcb39de380c5bd12bb0a4ebe337e687a9fc6/server/deno/models/assemblyai-pipeline.ts), and we'll walk through the parts that matter.
 
 ### Add the provider file
 
@@ -365,7 +363,7 @@ It reuses `ASSEMBLYAI_API_KEY`. To change the LLM, set `ASSEMBLYAI_LLM_MODEL` in
 After running this design and the framework on hundreds of ESP32 devices globally, here are the limits Akash Deb, founder of Elato, and his team have documented:
 
 - **Cold starts.** Connecting to a freshly started edge server takes about 2 to 3 seconds.
-- **Session length.** Edge hosts end a connection when their wall-clock limit is reached. Elato has tested up to 17 minutes of uninterrupted conversation.
+- **Session length.** Edge hosts end a connection when their wall-clock limit is reached. The team has tested up to 17 minutes of uninterrupted conversation.
 - **Interruptions.** For ESP32 boards without echo cancelleation, we cannot detect barge-in while the AI agent is speaking. It only stops playing when the server tells it to, or when the user explicitly sends a button/touchpad interrupt signal.
 
 ---
