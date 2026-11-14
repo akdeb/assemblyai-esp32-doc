@@ -8,9 +8,11 @@ site's compiled CSS, fonts (GT Standard, Modern Gothic Mono) and markup, with on
 npm install && npm run dev      # http://localhost:3000  (redirects to the ESP32 page)
 ```
 
-- `examples/esp32-realtime/server/main.ts`: Deno edge server (ESP32 <-> AssemblyAI STT / LLM Gateway / TTS)
-- `examples/esp32-realtime/firmware/`: PlatformIO ESP32-S3 firmware
-- `scripts/gen-docs.mjs`: regenerates `content/*.html` from `reference/*.html` (saved copies of the real pages)
-  and the example source files. Run `node scripts/gen-docs.mjs` after editing the example code.
+- `examples/esp32-realtime/`: the earlier standalone example. The page no longer uses it; it follows ElatoAI instead.
+- `content/realtime-esp32.md`: **the doc you edit.** Plain Markdown (see the comment at the top of the file for the few extras).
+- `scripts/gen-docs.mjs`: renders that Markdown into `content/realtime-esp32.html` using the real AssemblyAI page markup
+  (`reference/*.html`) and pulls code excerpts and pin numbers from a checkout of
+  [ElatoAI](https://github.com/akdeb/ElatoAI) (expected at `../../ElatoAI`, or set `ELATO_DIR`). Run `node scripts/gen-docs.mjs` after editing the
+  Markdown or the example code. Don't edit the generated `.html`.
 
 The copied stylesheet, fonts and logos under `public/` belong to AssemblyAI: for local preview only.
