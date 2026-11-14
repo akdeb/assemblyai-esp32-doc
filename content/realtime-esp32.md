@@ -363,7 +363,7 @@ It reuses `ASSEMBLYAI_API_KEY`. To change the LLM, set `ASSEMBLYAI_LLM_MODEL` in
 After running this design and the framework on hundreds of ESP32 devices globally, here are the limits Akash Deb, founder of Elato, and his team have documented:
 
 - **Cold starts.** Connecting to a freshly started edge server takes about 2 to 3 seconds.
-- **Session length.** Edge hosts end a connection when their wall-clock limit is reached. The team has tested up to 17 minutes of uninterrupted conversation.
+- **Session length.** Edge hosts end a connection when their wall-clock limit is reached. The team has tested up to 17 minutes of uninterrupted voice AI conversation.
 - **Interruptions.** For ESP32 boards without echo cancelleation, we cannot detect barge-in while the AI agent is speaking. It only stops playing when the server tells it to, or when the user explicitly sends a button/touchpad interrupt signal.
 
 ---
