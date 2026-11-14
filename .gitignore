@@ -42,3 +42,6 @@ next-env.d.ts
 
 # raw/rendered tutorial videos
 /vids/
+
+# platformio
+.pio/

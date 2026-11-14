@@ -4,9 +4,23 @@
 #define WIFI_SSID "your-wifi"
 #define WIFI_PASS "your-password"
 
-// --- Relay (the Deno server in ../server) ------------------------------
-#define RELAY_HOST "your-relay.deno.dev"
-#define RELAY_PORT 443
+// --- Edge server (the Deno server in ../server) -------------------------
+// Local development: your computer's LAN IP, port 8000, plain ws://.
+// Only use ws:// on a network you trust. Audio and DEVICE_TOKEN are sent unencrypted.
+#define RELAY_HOST "192.168.1.100"
+#define RELAY_PORT 8000
+#define RELAY_TLS 0  // 0 = ws:// (local), 1 = wss:// (hosted)
+
+// Hosted server: use these instead. wss:// encrypts everything with TLS.
+// #define RELAY_HOST "your-relay.deno.dev"
+// #define RELAY_PORT 443
+// #define RELAY_TLS 1
+
+// Optional, for wss://. Paste the PEM root CA certificate of your host here to
+// verify the server's identity. Without it the connection is encrypted but the
+// server certificate is not checked.
+// #define RELAY_CA_CERT "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----\n"
+
 #define DEVICE_TOKEN "same-value-as-the-server"
 
 // --- INMP441 microphone (I2S port 0) -----------------------------------

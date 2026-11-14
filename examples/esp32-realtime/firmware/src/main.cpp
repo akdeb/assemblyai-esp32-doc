@@ -117,7 +117,13 @@ void setup() {
   setupI2S();
 
   String path = String("/?token=") + DEVICE_TOKEN;
-  ws.beginSSL(RELAY_HOST, RELAY_PORT, path.c_str());
+#if RELAY_TLS && defined(RELAY_CA_CERT)
+  ws.beginSslWithCA(RELAY_HOST, RELAY_PORT, path.c_str(), RELAY_CA_CERT);  // wss://, server certificate verified
+#elif RELAY_TLS
+  ws.beginSSL(RELAY_HOST, RELAY_PORT, path.c_str());  // wss://, encrypted but server certificate not verified
+#else
+  ws.begin(RELAY_HOST, RELAY_PORT, path.c_str());  // ws://, for a server on your LAN
+#endif
   ws.onEvent(onEvent);
   ws.setReconnectInterval(2000);
   ws.enableHeartbeat(15000, 3000, 2);

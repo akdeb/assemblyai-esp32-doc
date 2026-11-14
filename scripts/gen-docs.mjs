@@ -87,6 +87,15 @@ const between = (src, from, to) => {
 async function esp32Content() {
   const server = read("server/main.ts");
   const mainCpp = read("firmware/src/main.cpp");
+  const config = read("firmware/src/Config.h");
+  // Pin numbers come straight from Config.h so the wiring table can't drift from the firmware.
+  const pin = (name) => {
+    const m = config.match(new RegExp(`^#define ${name} (\\d+)`, "m"));
+    if (!m) throw new Error(`pin not found in Config.h: ${name}`);
+    return `GPIO ${m[1]} (${ic(name)})`;
+  };
+  const localConfig = between(config, "// --- Wi-Fi", "// Hosted server");
+  const connect = between(mainCpp, "#if RELAY_TLS", "  ws.onEvent(onEvent);");
 
   const endpoints = between(server, "const STT_URL =", "// Deno's WebSocket");
   const sttLoop = between(server, "  const stt = authedSocket(STT_URL);", "  // --- Text-to-speech");
@@ -116,7 +125,7 @@ async function esp32Content() {
     table(
       ["Hop", "Protocol", "Notes"],
       [
-        ["ESP32 ⇄ edge server", "Secure WebSocket", `Binary frames carry audio. JSON frames carry ${ic("state")}, ${ic("transcript")}, and ${ic("interrupt")}.`],
+        ["ESP32 ⇄ edge server", `${ic("ws://")} on your LAN, ${ic("wss://")} when hosted`, `Binary frames carry audio. JSON frames carry ${ic("state")}, ${ic("transcript")}, and ${ic("interrupt")}.`],
         ["Edge server → STT", `${ic("wss://streaming.assemblyai.com/v3/ws")}`, `16 kHz PCM16 in, ${ic("Turn")} events out. ${ic("end_of_turn")} triggers the LLM.`],
         ["Edge server → LLM", `${ic("POST /v1/chat/completions")}`, "OpenAI-compatible LLM Gateway. Change the model with one environment variable."],
         ["Edge server → TTS", `${ic("wss://tts.us.assemblyai.com/v1/ws")}`, `${ic("Generate")} and ${ic("Flush")} in, base64 PCM16 24 kHz out, ${ic("Cancel")} on barge-in.`],
@@ -135,15 +144,38 @@ async function esp32Content() {
         ["LED (optional)", "Lights up when the agent is listening."],
       ],
     ),
-    p(`Pin assignments are in ${ic("Config.h")}. Change them to match your wiring.`),
+    heading("h3", "wiring", "Wiring"),
+    p(`Wire the two I2S boards to the ESP32-S3 as below. These are the defaults in ${ic("Config.h")}. If you use other pins, change them there.`),
+    table(
+      ["Module", "Module pin", "ESP32-S3 pin", "Notes"],
+      [
+        ["INMP441 mic", "VDD", "3V3", "3.3 V only. Don't connect it to 5 V."],
+        ["", "GND", "GND", ""],
+        ["", "SCK", pin("MIC_BCLK"), "Bit clock."],
+        ["", "WS", pin("MIC_WS"), "Word select."],
+        ["", "SD", pin("MIC_DIN"), "Audio data from the mic."],
+        ["", "L/R", "GND", "Selects the left channel, which the firmware reads. Don't leave it floating."],
+        ["MAX98357A amp", "VIN", "5V", "Power the amp from 5 V, not from the 3.3 V regulator."],
+        ["", "GND", "GND", ""],
+        ["", "BCLK", pin("SPK_BCLK"), "Bit clock."],
+        ["", "LRC", pin("SPK_WS"), "Word select."],
+        ["", "DIN", pin("SPK_DOUT"), "Audio data to the amp."],
+        ["", "+ and −", "Speaker", "4 or 8 Ω speaker. Leave SD and GAIN unconnected."],
+        ["Button", "", pin("BUTTON_PIN"), "The on-board BOOT button. No wiring needed."],
+        ["LED (optional)", "", pin("LED_PIN"), "On-board LED on many S3 boards."],
+      ],
+    ),
+    p(`The mic and the amp use separate I2S ports, so they don't share clock pins. Keep the jumper wires short and make sure every module shares a ground with the ESP32.`),
     hr,
     heading("h2", "build-the-voice-agent", "Build the voice agent"),
     heading("h3", "step-1-set-your-api-key-and-device-token", "Step 1: Set your API key and device token"),
     p(`The device token is a shared secret between the ESP32 and your edge server.`),
     await code(`export ASSEMBLYAI_API_KEY=<your-key>\nexport DEVICE_TOKEN=$(openssl rand -hex 16)`, "bash"),
     heading("h3", "step-2-run-the-edge-server", "Step 2: Run the edge server"),
-    p(`The server is one Deno file, ${ic("examples/esp32-realtime/server/main.ts")}. Run it locally, or deploy it to a Deno-compatible host close to your users.`),
+    p(`The server is one Deno file, ${ic("examples/esp32-realtime/server/main.ts")}. Start it on your computer first. You deploy it in ${a("#step-5-deploy-and-switch-to-wss", "Step 5")}.`),
     await code(`deno run -A examples/esp32-realtime/server/main.ts`, "bash"),
+    p(`A local Deno server speaks plain HTTP on port 8000, so the device reaches it at ${ic("ws://<your-computer-ip>:8000")}. There is no TLS on this hop yet. Check that the server is up:`),
+    await code(`curl http://localhost:8000/health   # prints "ok"`, "bash"),
     p(`It talks to three AssemblyAI endpoints. Every one authenticates with your API key.`),
     await code(endpoints, "typescript"),
     p(`STT stays open for the whole session. When a final turn arrives, the server forwards the transcript to the device and, if the agent is mid-reply, cuts it off first.`),
@@ -151,12 +183,37 @@ async function esp32Content() {
     p(`Replies are handled one at a time: ask the LLM, then speak the answer.`),
     await code(turnLoop, "typescript"),
     heading("h3", "step-3-flash-the-firmware", "Step 3: Flash the firmware"),
-    p(`Open ${ic("examples/esp32-realtime/firmware")} in PlatformIO. In ${ic("Config.h")}, set your Wi-Fi credentials, the edge server host, and the same ${ic("DEVICE_TOKEN")}. Then flash:`),
+    p(`The ESP32 can't use ${ic("localhost")}. It needs your computer's address on the local network. Find it:`),
+    await code(`ipconfig getifaddr en0   # macOS\nhostname -I              # Linux\nipconfig                 # Windows, look for "IPv4 Address"`, "bash"),
+    p(`Open ${ic("examples/esp32-realtime/firmware")} in PlatformIO. In ${ic("Config.h")}, set your Wi-Fi credentials, put that IP address in ${ic("RELAY_HOST")}, and use the same ${ic("DEVICE_TOKEN")} as the server. Leave ${ic("RELAY_PORT")} at ${ic("8000")} and ${ic("RELAY_TLS")} at ${ic("0")}.`),
+    await code(localConfig, "cpp"),
+    p(`The ESP32 and your computer must be on the same Wi-Fi network, and that network must be 2.4 GHz. Then flash:`),
     await code(`cd examples/esp32-realtime/firmware\npio run -t upload && pio device monitor`, "bash"),
     p(`The firmware has two jobs. One task reads the mic and streams PCM16 to the server. The main loop drains a playback buffer into the speaker, and clears it on interrupt.`),
     await code(firmwareIO, "cpp"),
     heading("h3", "step-4-talk-to-it", "Step 4: Talk to it"),
     p(`When the serial monitor prints ${ic("server connected")}, start talking. Transcripts show up in the monitor and the reply plays through the speaker. Press the button, or talk over it, to interrupt.`),
+    heading("h3", "step-5-deploy-and-switch-to-wss", "Step 5: Deploy and switch to wss://"),
+    p(`So far the device talks to the server over ${ic("ws://")}, which is unencrypted. Anyone on the same network can read the audio and the ${ic("DEVICE_TOKEN")}, which travels in the URL. That's acceptable on your own Wi-Fi while you develop. It isn't acceptable once the traffic crosses the internet.`),
+    p(`For a remote server, use ${ic("wss://")}. It's the same WebSocket protocol inside TLS, so the traffic is encrypted and can't be read or changed in transit. You don't add TLS to ${ic("main.ts")}. The host terminates it in front of the same code.`),
+    table(
+      ["", "Local development", "Hosted server"],
+      [
+        ["Device connects to", `${ic("ws://192.168.1.100:8000")}`, `${ic("wss://your-relay.deno.dev")}`],
+        ["Encryption", "None", "TLS"],
+        ["Who provides TLS", `Nobody. ${ic("Deno.serve")} speaks plain HTTP.`, "The host, for example Deno Deploy or a reverse proxy."],
+        [ic("RELAY_HOST"), "Your computer's LAN IP", "Your deployment's hostname"],
+        [ic("RELAY_PORT"), ic("8000"), ic("443")],
+        [ic("RELAY_TLS"), ic("0"), ic("1")],
+        ["Use it for", "Development on a network you trust", "Everything else"],
+      ],
+    ),
+    p(`Deploy ${ic("main.ts")} to Deno Deploy or another Deno-compatible host close to your users, and set ${ic("ASSEMBLYAI_API_KEY")} and ${ic("DEVICE_TOKEN")} as environment variables there. Then change three lines in ${ic("Config.h")} and flash again:`),
+    await code(`#define RELAY_HOST "your-relay.deno.dev"\n#define RELAY_PORT 443\n#define RELAY_TLS 1`, "cpp"),
+    p(`${ic("RELAY_TLS")} picks the connection call in ${ic("main.cpp")}:`),
+    await code(connect, "cpp"),
+    callout(`TLS only stops a man-in-the-middle attack if the device checks the server's certificate. To keep the example short, the firmware encrypts the connection but doesn't verify the certificate by default. Before you ship, set ${ic("RELAY_CA_CERT")} in ${ic("Config.h")} to your host's root CA certificate. The firmware then refuses any server that can't prove its identity.`),
+    p(`The hops from the edge server to AssemblyAI always use ${ic("wss://")} and ${ic("https://")}, in local development too.`),
     hr,
     heading("h2", "how-it-works", "How it works"),
     ul([
@@ -166,7 +223,7 @@ async function esp32Content() {
       `<strong>Raw PCM.</strong> The example sends uncompressed PCM16, about 32 KB/s up and 48 KB/s down. That's fine on Wi-Fi. Elato's firmware compresses audio with Opus, and adding it here is the main upgrade if your network is weak.`,
     ]),
     hr,
-    heading("h2", "limitations-and-troubleshooting", "Limitations and troubleshooting"),
+    heading("h2", "limitations", "Limitations"),
     p(`After running this design and the ${a(ELATO, "Elato")} framework on hundreds of ESP32 devices, these were the limits documented by Akash Deb, founder of Elato:`),
     ul([
       `<strong>Cold starts.</strong> Connecting to a freshly started edge server takes about 2 to 3 seconds.`,
@@ -175,11 +232,45 @@ async function esp32Content() {
       `<strong>Interruptions.</strong> The ESP32 doesn't detect speech itself. It stops playing only when the server sends ${ic("interrupt")} or you press the button.`,
     ]),
     p(`Two more limits are specific to this example. It sends raw PCM, so it needs a steady Wi-Fi link. And ${ic("DEVICE_TOKEN")} is one shared secret for every device, which is fine for a prototype. Give each device its own credentials before you ship, as Elato does with its Supabase device registration.`),
-    p(`If something doesn't work, isolate one half at a time:`),
+    hr,
+    heading("h2", "troubleshooting", "Troubleshooting"),
+    p(`Most problems are Wi-Fi, wiring or power. Keep the serial monitor open with ${ic("pio device monitor")}. It shows how far the device got: dots while it joins Wi-Fi, then ${ic("Wi-Fi connected")}, then ${ic("server connected")}, then your transcripts.`),
+    heading("h3", "wi-fi-never-connects", "Wi-Fi never connects"),
+    p(`The serial monitor prints dots and never reaches ${ic("Wi-Fi connected")}.`),
     ul([
-      `<strong>Speaker is silent.</strong> Before you debug the voice pipeline, get a small internet-radio sketch playing through the MAX98357A on its own. If the radio plays, your wiring and I2S pins are fine and the problem is in the audio stream. If it doesn't, recheck the pins in ${ic("Config.h")}.`,
-      `<strong>Mic isn't working.</strong> Try a local LAN server first. Run the edge server on your computer, join the same Wi-Fi, and in ${ic("main.cpp")} replace ${ic("ws.beginSSL(RELAY_HOST, RELAY_PORT, ...)")} with ${ic("ws.begin(<your computer's IP>, 8000, ...)")}. Once your transcripts show up in the serial monitor, move to a hosted server.`,
-      `<strong>Stuck connecting.</strong> Power-cycle the board after you change Wi-Fi credentials, and check that ${ic("DEVICE_TOKEN")} matches on the device and the server.`,
+      `<strong>Use a 2.4 GHz network.</strong> The ESP32-S3 can't see 5 GHz Wi-Fi. If your router puts both bands under one name and the device won't join, create a separate 2.4 GHz network. On an iPhone hotspot, turn on Maximize Compatibility.`,
+      `<strong>Check the credentials.</strong> ${ic("WIFI_SSID")} and ${ic("WIFI_PASS")} are case-sensitive. Networks with a login page or a username, like hotel and office Wi-Fi, don't work with this firmware.`,
+      `<strong>Power-cycle the board</strong> after you change Wi-Fi credentials.`,
+    ]),
+    heading("h3", "server-never-connects", "Server never connects"),
+    p(`You see ${ic("Wi-Fi connected")} but not ${ic("server connected")}. The device retries every 2 seconds without printing an error.`),
+    ul([
+      `<strong>${ic("ws://")} and ${ic("wss://")} are mixed up.</strong> A local Deno server only accepts ${ic("ws://")}, so ${ic("RELAY_TLS")} must be ${ic("0")} with port ${ic("8000")}. A hosted server only accepts ${ic("wss://")}, so ${ic("RELAY_TLS")} must be ${ic("1")} with port ${ic("443")}.`,
+      `<strong>The device can't reach your computer.</strong> ${ic("RELAY_HOST")} must be your computer's LAN IP, not ${ic("localhost")}. From a phone on the same Wi-Fi, open ${ic("http://<your-computer-ip>:8000/health")}. If it doesn't load, allow incoming connections for Deno in your firewall, and avoid guest networks, which often block devices from reaching each other.`,
+      `<strong>The token doesn't match.</strong> ${ic("DEVICE_TOKEN")} must be the same in ${ic("Config.h")} and in the server's environment. The server rejects every device if you start it without ${ic("DEVICE_TOKEN")} set.`,
+    ]),
+    heading("h3", "no-transcripts-from-the-mic", "No transcripts from the mic"),
+    p(`The server connects, but nothing you say shows up in the serial monitor.`),
+    ul([
+      `<strong>Recheck the three I2S wires.</strong> SCK, WS and SD must go to the pins in the ${a("#wiring", "wiring table")}. One wire in the wrong place gives silence, not an error.`,
+      `<strong>Tie L/R to GND.</strong> The firmware reads the left channel. A floating L/R pin gives silence or noise.`,
+      `<strong>Power the mic from 3V3</strong> and check that its ground reaches the ESP32.`,
+      `<strong>Shorten the wires.</strong> Long or loose jumper wires corrupt the I2S clock. Reseat them or solder the connections.`,
+    ]),
+    heading("h3", "no-sound-from-the-speaker", "No sound from the speaker"),
+    p(`You see the assistant's reply in the serial monitor but hear nothing, or only static.`),
+    ul([
+      `<strong>Recheck BCLK, LRC and DIN.</strong> Swapping BCLK and LRC is the most common mistake.`,
+      `<strong>Leave the amp's SD pin unconnected.</strong> Tying it to GND shuts the amp down.`,
+      `<strong>Test the speaker on its own.</strong> Get a small internet-radio sketch playing through the MAX98357A. If the radio plays, your wiring and I2S pins are fine and the problem is in the audio stream. If it doesn't, recheck the pins in ${ic("Config.h")}.`,
+    ]),
+    heading("h3", "board-resets-or-audio-crackles", "Board resets or audio crackles"),
+    p(`The board reboots when Wi-Fi connects or when the assistant starts speaking, and the serial monitor may print ${ic("Brownout detector was triggered")}. This is a USB brownout. Wi-Fi transmission and the amplifier draw current in bursts, and a weak USB port or a thin cable can't keep the voltage up.`),
+    ul([
+      `<strong>Change the cable and the port.</strong> Use a short, good-quality USB cable plugged straight into your computer or a 5 V supply rated for 1 A or more. Avoid unpowered hubs.`,
+      `<strong>Power the amp from the 5V pin.</strong> On 3V3 it shares the regulator with the ESP32 and pulls the voltage down.`,
+      `<strong>Add a capacitor.</strong> 470 µF or more across the amp's VIN and GND absorbs the current spikes.`,
+      `<strong>Lower the load.</strong> An 8 Ω speaker draws less current than a 4 Ω one.`,
     ]),
     hr,
     heading("h2", "voice-agent-api-alternative", "Voice Agent API alternative"),
@@ -314,13 +405,22 @@ function build({ title, subtitle, path, content, toc, sidebarActiveChild, prev, 
 }
 
 const esp32Toc = [
-  ["overview", "Overview"], ["architecture", "Architecture"], ["hardware", "Hardware"],
+  ["overview", "Overview"], ["architecture", "Architecture"], ["hardware", "Hardware"], ["wiring", "Wiring", 1],
   ["build-the-voice-agent", "Build the voice agent"],
   ["step-1-set-your-api-key-and-device-token", "Step 1: Set your API key and device token", 1],
   ["step-2-run-the-edge-server", "Step 2: Run the edge server", 1],
   ["step-3-flash-the-firmware", "Step 3: Flash the firmware", 1],
   ["step-4-talk-to-it", "Step 4: Talk to it", 1],
-  ["how-it-works", "How it works"], ["limitations-and-troubleshooting", "Limitations and troubleshooting"], ["customize-and-extend", "Customize and extend"], ["next-steps", "Next steps"],
+  ["step-5-deploy-and-switch-to-wss", "Step 5: Deploy and switch to wss://", 1],
+  ["how-it-works", "How it works"], ["limitations", "Limitations"],
+  ["troubleshooting", "Troubleshooting"],
+  ["wi-fi-never-connects", "Wi-Fi never connects", 1],
+  ["server-never-connects", "Server never connects", 1],
+  ["no-transcripts-from-the-mic", "No transcripts from the mic", 1],
+  ["no-sound-from-the-speaker", "No sound from the speaker", 1],
+  ["board-resets-or-audio-crackles", "Board resets or audio crackles", 1],
+  ["voice-agent-api-alternative", "Voice Agent API alternative"],
+  ["customize-and-extend", "Customize and extend"], ["next-steps", "Next steps"],
 ];
 
 writeFileSync("content/realtime-esp32.html", build({
