@@ -1,6 +1,6 @@
 ---
 title: Real-time voice AI on ESP32
-subtitle: Build a voice agent on a $10 ESP32-S3 with Elato and the AssemblyAI Voice Agent API, or with streaming Speech-to-Text, LLM Gateway, and Text-to-Speech.
+subtitle: Stream audio from an ESP32-S3 microphone to a voice agent that listens, thinks, and talks back through a speaker, using Elato and AssemblyAI.
 ---
 
 <!--
@@ -21,13 +21,15 @@ Do not edit content/realtime-esp32.html. It is generated and gets overwritten.
 - Raw HTML (the video embed and the wiring image) is passed through as is.
 -->
 
+**Products used:** [Voice Agent API](https://www.assemblyai.com/docs/voice-agent) + [Real-time STT](https://www.assemblyai.com/docs/streaming) + [LLM Gateway](https://www.assemblyai.com/docs/llm-gateway) + [Text-to-Speech](https://www.assemblyai.com/docs/tts)
+
+**Model selection:** The Voice Agent API manages the models for you, so it's the fastest way to get talking. For the optional pipeline we use `universal-3-6-pro` for streaming speech-to-text, `claude-haiku-4-5-20251001` through LLM Gateway for the reply, and the `aai-kyla` voice for text-to-speech.
+
 ## Overview
 
-In this guide we'll learn how to build conversational AI agents with the ESP32-S3 and AssemblyAI. We'll use the ESP32-S3 because it's a powerful, low-cost, low-power microcontroller that can run a voice agent over secure WebSockets with a Deno Edge Server relay between our latest ASR, LLM Gateway, and TTS models.
+In this guide we'll build a voice agent on an ESP32-S3 with an INMP441 MEMS microphone and a MAX98357A amplifier and speaker. Mic audio is sampled as PCM16 at 16 kHz and relayed over a secure WebSocket to a Deno edge server, which talks to AssemblyAI. The reply plays out of the speaker at 24 kHz, and you can interrupt it at any time with a button or touchpad.
 
-We'll build our voice agent on an ESP32-S3 with an INMP441 MEMS microphone and a MAX98357A amplifier and speaker. You talk into the mic where PCM16 audio is sampled at 16kHz and relayed via WebSockets to a Deno edge server and the AI speech plays out of the speaker at 24kHz.
-
-We'll use the voice agent architecture design from [ElatoAI](https://github.com/akdeb/ElatoAI), an open-source project for building conversational AI interfaces on ESP32 devices. The full project ships ESP32 firmware, a Deno edge server, a Next.js app with Supabase DB. AssemblyAI handles the speech-to-text, the LLM reply through LLM Gateway, and the text-to-speech. You can also interrupt the agent at any time by pressing a dedicated button or touchpad. The project's AssemblyAI managed Voice Agent API server files are available on [GitHub](https://github.com/akdeb/ElatoAI). Let's dive in!
+The voice architecture design comes from [ElatoAI](https://github.com/akdeb/ElatoAI), an MIT-licensed, open-source project that ships the ESP32 firmware, the Deno edge server, and a Next.js webapp with a Supabase DB. The AssemblyAI Deno server files are live in the same repo. Let's dive in!
 
 <div style="display:flex;justify-content:center;margin:1.5rem 0"><iframe src="https://www.youtube.com/embed/FAm6QM6FgiA" title="AssemblyAI voice agent on ESP32 demo" style="width:100%;max-width:340px;aspect-ratio:9/16;border:0;border-radius:12px" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>
 
