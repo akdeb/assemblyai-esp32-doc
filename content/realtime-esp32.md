@@ -1,6 +1,6 @@
 ---
 title: Real-time voice AI on ESP32
-subtitle: Stream audio from an ESP32-S3 microphone through AssemblyAI streaming speech-to-text, LLM Gateway, and text-to-speech to build a voice agent that listens, thinks, and talks back through a speaker, using Elato.
+subtitle: Stream audio from an ESP32-S3 microphone to a voice agent that listens, thinks, and talks back through a speaker, using Elato and AssemblyAI.
 ---
 
 <!--
