@@ -2,7 +2,7 @@
 //
 // Edge relay between an ESP32 and AssemblyAI.
 //
-//   ESP32 mic --PCM16 16 kHz--> relay --> AssemblyAI Streaming STT (Universal-3.6 Pro)
+//   ESP32 mic --PCM16 16 kHz--> relay --> AssemblyAI Streaming STT (AssemblyAI-STT-3.7-Realtime-Agent)
 //                                  |--> LLM Gateway (chat completions)
 //   ESP32 spk <--PCM16 24 kHz-- relay <-- AssemblyAI TTS (WebSocket)
 //
@@ -24,7 +24,7 @@ const SPK_RATE = 24000; // relay -> ESP32
 
 const STT_URL =
   "wss://streaming.assemblyai.com/v3/ws?" +
-  new URLSearchParams({ speech_model: "universal-3-6-pro", sample_rate: String(MIC_RATE) });
+  new URLSearchParams({ speech_model: "assemblyai-stt-3-7-realtime-agent", sample_rate: String(MIC_RATE) });
 
 const TTS_URL =
   "wss://tts.us.assemblyai.com/v1/ws?" +
