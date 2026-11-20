@@ -113,6 +113,13 @@ The mic and the amp use separate I2S ports, so they don't share clock pins. Keep
 
 ## Build the voice agent
 
+Before you start, you need:
+
+- The hardware above, wired up.
+- [PlatformIO](https://platformio.org/) to flash the firmware, and [Deno](https://deno.com/) to run the edge server.
+- A Supabase project and the Elato web app running locally. The [ElatoAI quickstart](https://www.elatoai.com/docs/quickstart) covers both.
+- An AssemblyAI API key.
+
 ### Step 1: Clone the repo
 
 ```bash
@@ -122,7 +129,7 @@ cd assemblyai-esp32
 
 From here on, we'll run everything from the root of this repo. For full setup, firmware flashing and frontend quickstart details, see the [quickstart docs](https://www.elatoai.com/docs/quickstart).
 
-### Step 2: Set your AssemblyAI API key
+### Step 2: Set your environment variables
 
 The edge server holds your API key, so it never touches the device. You can get one from the [AssemblyAI dashboard](https://www.assemblyai.com/dashboard). The same key works for speech-to-text, LLM Gateway and text-to-speech.
 
@@ -131,10 +138,12 @@ cd server/deno
 cp .env.example .env
 ```
 
-Set the key in `server/deno/.env`:
+Set these in `server/deno/.env`. The server stores conversations in Supabase, so it needs your Supabase project URL and anon key too:
 
 ```bash
 ASSEMBLYAI_API_KEY=<your-assemblyai-key>
+SUPABASE_URL=<your-supabase-url>
+SUPABASE_KEY=<your-supabase-anon-key>
 ```
 
 ### Step 3: Run the Deno edge server
@@ -168,7 +177,7 @@ When you interrupt, we cancel the pipeline from the front. The model request is 
 
 When the call ends, we send `Terminate` on both sessions so you're billed only for the call.
 
-Time to run it. The server stores conversations in Supabase, so add your Supabase anon key to `server/deno/.env` as `SUPABASE_KEY`, then start the server from `server/deno`:
+Time to run it. Start the server from `server/deno`:
 
 ```bash
 deno run -A --env-file=.env main.ts
