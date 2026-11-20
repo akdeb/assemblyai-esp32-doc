@@ -25,8 +25,6 @@ Do not edit content/realtime-esp32.html. It is generated and gets overwritten.
 
 **Model selection:** We use `assemblyai-stt-3-7-realtime-agent` for streaming speech-to-text, `claude-haiku-4-5-20251001` through LLM Gateway for the reply, and the `aai-kyla` voice for text-to-speech. Each one is a setting you can change.
 
-> [!NOTE] AssemblyAI is retiring the managed Voice Agent API in favor of these three products, so this guide builds the agent from them directly. If you're coming from the Voice Agent API, see [Migrating from the Voice Agent API](#migrating-from-the-voice-agent-api).
-
 ## Overview
 
 In this guide we'll build a voice agent on an ESP32-S3 with an INMP441 MEMS microphone and a MAX98357A amplifier and speaker. Mic audio is sampled as PCM16 at 16 kHz and relayed over a secure WebSocket to a Deno edge server. The server streams it to AssemblyAI speech-to-text, sends each finished turn to LLM Gateway, and streams the reply sentence by sentence to text-to-speech. The reply plays out of the speaker at 24 kHz, and you can interrupt it at any time with a button or touchpad.
@@ -187,8 +185,6 @@ Locally the server speaks plain HTTP on port 8000, so the ESP32 reaches it at `w
 
 Last piece: in the web app, create a character, pick **AssemblyAI** as its voice provider, and choose a voice like `aai-kyla`, `aai-peter` or `aai-nancy`. The picker has a starter set, and any `voice_id` from the [voice catalog](https://www.assemblyai.com/docs/tts/voices) works.
 
-The server reads the provider every time a device connects, so you can switch a character's provider without restarting the server or reflashing the ESP32.
-
 ### Step 4: Talk to it
 
 Once the serial monitor shows the device is connected, the speaker should start playing out the AI agent's voice. Start talking to the agent and you should hear it respond. Depending on your setup, you can press the button or touchpad to interrupt it mid-speech.
@@ -237,16 +233,6 @@ Every stage is a setting in `server/deno/.env`, so you can change one without to
 | `ASSEMBLYAI_PLAYBACK_LEAD_MS` | `800` | How much audio the server keeps ahead of the speaker. |
 
 The voice is a per-character setting in the web app, not a server setting.
-
-## Migrating from the Voice Agent API
-
-AssemblyAI is sunsetting the managed Voice Agent API, which Elato supported through the `assemblyai` provider and `models/assemblyai.ts`. The old provider still works until the API is shut down, but it's marked deprecated in the web app. To move over:
-
-- **Allow the new provider.** Run the migration `supabase/migrations/20261121000000_add_assemblyai_pipeline_provider.sql`, which allows the new `assemblyai-pipeline` provider value.
-- **Update your characters.** Edit each character that uses the old provider, pick **AssemblyAI** and choose a text-to-speech voice. The old voice names, like `alba` and `eve`, aren't text-to-speech voices.
-- **Keep the firmware.** You don't need to reflash the ESP32. The device protocol is the same.
-
-Two things change. You now choose the speech-to-text, LLM and text-to-speech models yourself instead of AssemblyAI choosing for you, and turn-taking comes from speech-to-text end-of-turn detection instead of the Voice Agent API's own.
 
 ## How it works
 
