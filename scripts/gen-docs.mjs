@@ -101,7 +101,10 @@ const inline = (tok) => md.renderer.renderInline(tok.children, md.options, {});
 const slug = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 async function esp32Content() {
-  const config = read("firmware-arduino/src/Config.cpp");
+  // This guide is for the INMP441 + MAX98357A devkit. Config.cpp also has an
+  // `#ifdef ELATO_BOARD_VOICE_V1 ... #else` block with another board's pins: drop it so the
+  // wiring table always shows the devkit pins, whichever ElatoAI branch is checked out.
+  const config = read("firmware-arduino/src/Config.cpp").replace(/#ifdef ELATO_BOARD_VOICE_V1[\s\S]*?#else\n/g, "");
   // {{pin:NAME}} -> "GPIO n (`NAME`)", from firmware-arduino/src/Config.cpp so the wiring table can't drift from the firmware.
   const body = MD_BODY.replace(/\{\{pin:(\w+)\}\}/g, (_, name) => {
     const m = config.match(new RegExp(`^const [\\w:]+ ${name} = (?:GPIO_NUM_)?(\\d+);`, "m"));
