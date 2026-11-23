@@ -23,7 +23,7 @@ Do not edit content/realtime-esp32.html. It is generated and gets overwritten.
 
 **Products used:** [Real-time STT](https://www.assemblyai.com/docs/streaming) + [LLM Gateway](https://www.assemblyai.com/docs/llm-gateway) + [Text-to-Speech](https://www.assemblyai.com/docs/tts)
 
-**Model selection:** We use `assemblyai-stt-3-7-realtime-agent` for streaming speech-to-text, `gemma-4-31b` through LLM Gateway for the reply and its tool calls, and the `aai-kyla` voice for text-to-speech. Each character picks its own LLM and voice in the web app, so you can change either without touching the server.
+**Model selection:** We use `assemblyai-stt-3-7-realtime-agent` for streaming speech-to-text, `gemma-4-31b` through LLM Gateway for the reply and its tool calls, and AssemblyAI's newest text-to-speech model, TTS-1 (`assemblyai-tts-1`), with the `aai-kyla` voice. Each character picks its own LLM and voice in the web app, so you can change either without touching the server.
 
 ## Overview
 
@@ -53,7 +53,7 @@ The voice architecture design comes from [ElatoAI](https://github.com/akdeb/Elat
 │              │        │ device             │ ◀───── │ streamed reply       │
 │ MAX98357A    │◀────── │ runs tool calls    │        └──────────────────────┘
 │ + speaker    │ Opus   │ sentence-by-       │  wss   ┌──────────────────────┐
-└──────────────┘        │ sentence to TTS    │ ─────▶ │ Streaming TTS        │
+└──────────────┘        │ sentence to TTS    │ ─────▶ │ Streaming TTS-1      │
                         └────────────────────┘ ◀───── │ 24 kHz PCM audio     │
                                                       └──────────────────────┘
 ```
@@ -63,7 +63,7 @@ The voice architecture design comes from [ElatoAI](https://github.com/akdeb/Elat
 | ESP32 ⇄ edge server | `ws://` in `DEV_MODE`, `wss://` otherwise | Mic audio goes up as PCM16 at 16 kHz. The reply comes back as Opus packets. JSON frames carry control messages such as `INTERRUPT`. |
 | Edge server → STT | `wss://streaming.assemblyai.com/v3/ws` | The mic audio is forwarded as is. A `Turn` message with `end_of_turn` marks the end of what you said. |
 | Edge server → LLM Gateway | `https://llm-gateway.assemblyai.com/v1/chat/completions` | OpenAI-compatible, with `stream: true` so tokens arrive as they are written, and `tools` so the model can ask the server to run something. |
-| Edge server → TTS | `wss://tts.us.assemblyai.com/v1/ws` | `Generate` sends text, `Flush` ends a sentence, `Cancel` handles barge-in. 24 kHz PCM comes back. |
+| Edge server → TTS | `wss://tts.us.assemblyai.com/v1/ws` | Runs TTS-1 (`assemblyai-tts-1`). `Generate` sends text, `Flush` ends a sentence, `Cancel` handles barge-in. 24 kHz PCM comes back. |
 
 Both WebSockets stay open for the whole call, so no turn pays for a new handshake.
 
@@ -187,7 +187,7 @@ deno run -A --env-file=.env main.ts
 
 Locally the server speaks plain HTTP on port 8000, so the ESP32 reaches it at `ws://<your-computer-ip>:8000`. There's no TLS on this hop yet. We'll fix that in [Step 5](#step-5-deploy-and-switch-to-wss) when we deploy the server to a remote host.
 
-Last piece: in the web app, create a character and choose **Pipeline**. You get three dropdowns, one per stage. Pick **STT-3.7 Realtime Agent** (`assemblyai-stt-3-7-realtime-agent`) for speech-to-text, an LLM Gateway model for the LLM, and a voice like `aai-kyla`, `aai-peter` or `aai-nancy` for text-to-speech. The picker has a starter set, and any `voice_id` from the [voice catalog](https://www.assemblyai.com/docs/tts/voices) works, including a voice you cloned in the dashboard: set `ASSEMBLYAI_TTS_VOICE` to its id.
+Last piece: in the web app, create a character and choose **Pipeline**. You get three dropdowns, one per stage. Pick **STT-3.7 Realtime Agent** (`assemblyai-stt-3-7-realtime-agent`) for speech-to-text, an LLM Gateway model for the LLM, and a TTS-1 voice like `aai-kyla`, `aai-peter` or `aai-nancy` for text-to-speech. The picker has a starter set, and any `voice_id` from the [voice catalog](https://www.assemblyai.com/docs/tts/voices) works, including a voice you cloned in the dashboard: set `ASSEMBLYAI_TTS_VOICE` to its id.
 
 ### Step 4: Talk to it
 
