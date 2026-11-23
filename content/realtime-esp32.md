@@ -33,7 +33,7 @@ Because the server owns the loop, the agent can do more than chat. The model can
 
 The voice architecture design comes from [ElatoAI](https://github.com/akdeb/ElatoAI), an MIT-licensed, open-source project that ships the ESP32 firmware, the Deno edge server, and a Next.js webapp with a Supabase DB. The pipeline lives in `server/deno/models/pipeline/`, with one small plug-in per stage, and uses only Deno's built-in `WebSocket` and `fetch` to reach AssemblyAI. Let's dive in!
 
-<div style="display:flex;justify-content:center;margin:1.5rem 0"><iframe src="https://www.youtube.com/embed/FAm6QM6FgiA" title="AssemblyAI voice agent on ESP32 demo" style="width:100%;max-width:340px;aspect-ratio:9/16;border:0;border-radius:12px" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>
+<div style="display:flex;justify-content:center;margin:1.5rem 0"><iframe src="https://www.youtube.com/embed/0WvnWQE5JS0" title="ESP32 plant agent with AssemblyAI tool calls" style="width:100%;max-width:340px;aspect-ratio:9/16;border:0;border-radius:12px" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>
 
 > [!NOTE] We'll set `ASSEMBLYAI_API_KEY` on the edge server only, so the key never touches the device. You can get one from the [AssemblyAI dashboard](https://www.assemblyai.com/dashboard).
 
@@ -239,9 +239,7 @@ Each tool call shows up in the server log with its arguments and result, which m
 
 ### Example: a plant that talks back
 
-<div style="display:flex;justify-content:center;margin:1.5rem 0"><iframe src="https://www.youtube.com/embed/0WvnWQE5JS0" title="ESP32 plant agent with AssemblyAI tool calls" style="width:100%;max-width:340px;aspect-ratio:9/16;border:0;border-radius:12px" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>
-
-Here's the demo in the video above. A soil moisture sensor sits in a plant pot, the ESP32 streams its reading to the server twice a second as a `{"type":"sensor"}` frame on the same WebSocket, and the agent plays the plant. The tool pack in `tools/plant.ts` gives the model two tools:
+This is the demo in the video at the top of this page. A soil moisture sensor sits in a plant pot, the ESP32 streams its reading to the server twice a second as a `{"type":"sensor"}` frame on the same WebSocket, and the agent plays the plant. The tool pack in `tools/plant.ts` gives the model two tools:
 
 ```typescript file="server/deno/models/pipeline/tools/plant.ts" from="export const PLANT_TOOLS" to="export const PLANT_PROMPT"
 ```
