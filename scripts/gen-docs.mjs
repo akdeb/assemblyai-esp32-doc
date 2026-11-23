@@ -90,7 +90,13 @@ const between = (src, from, to) => {
   const i = src.indexOf(from);
   const j = src.indexOf(to, i);
   if (i < 0 || j < 0) throw new Error(`excerpt markers not found: ${from} .. ${to}`);
-  return src.slice(i, j).trimEnd();
+  // Excerpts come out of nested code: shift them left so the first line starts at column 0,
+  // and drop trailing lines that close blocks opened before the excerpt (indent < first line).
+  const lines = src.slice(i, j).trimEnd().split("\n");
+  const indent = (l) => l.match(/^ */)[0].length;
+  const base = indent(lines[0]);
+  while (lines.length > 1 && lines.at(-1).trim() && indent(lines.at(-1)) < base) lines.pop();
+  return lines.map((l) => l.slice(Math.min(base, indent(l)))).join("\n");
 };
 
 const md = new MarkdownIt({ html: true });
