@@ -152,7 +152,7 @@ The Deno edge server in `server/deno` sits between the ESP32 and AssemblyAI. The
 
 The mic audio is already 16 kHz PCM16, which is what speech-to-text takes, so it's forwarded without resampling. The `speech_model` is the one built for voice agents, and `min_turn_silence` and `max_turn_silence` set how long a pause has to be before AssemblyAI ends your turn. The text-to-speech session asks for 24 kHz PCM, which is the rate the server's Opus encoder uses, so it needs no conversion either.
 
-```typescript file="server/deno/models/pipeline/stt/assemblyai.ts" from="        const url = `wss://${HOST}/v3/ws?`" to="        let sock: WebSocket | null = null;"
+```typescript file="server/deno/models/pipeline/stt/assemblyai.ts" from="        const url = " to="        let sock: WebSocket | null = null;"
 ```
 
 When a `Turn` arrives with `end_of_turn` set, the runner tells the device it can stop listening and starts a reply:
